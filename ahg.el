@@ -68,8 +68,60 @@ the current dir is not under hg."
     (puthash "?" ahg-status-unknown-face h)
     h))
 
+(defvar ahg-status-line-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mouse-2] 'ahg-status-visit-file-other-window)
+    map))
+
 (defun ahg-face-from-status (status-code)
   (gethash status-code ahg-face-status-hash 'default))
+
+
+(define-derived-mode ahg-status-mode nil "aHg-status"
+  "Major mode for *hg status* buffers."
+  (toggle-read-only t)
+  (font-lock-mode nil)
+  (define-key ahg-status-mode-map "C-h" 'describe-mode)
+  (define-key ahg-status-mode-map " " 'ahg-status-toggle-mark)
+  (define-key ahg-status-mode-map "m" (lambda () (interactive)
+                                        (ahg-status-mark t)))
+  (define-key ahg-status-mode-map "u" (lambda () (interactive)
+                                        (ahg-status-mark nil)))
+  (define-key ahg-status-mode-map "c" 'ahg-status-commit)
+  (define-key ahg-status-mode-map "a" 'ahg-status-add)
+  (define-key ahg-status-mode-map "=" 'ahg-status-diff)
+  (define-key ahg-status-mode-map "D" 'ahg-status-diff-all)
+  (define-key ahg-status-mode-map "r" 'ahg-status-remove)
+  (define-key ahg-status-mode-map "g" 'ahg-status-refresh)
+  (define-key ahg-status-mode-map "q" 'ahg-buffer-quit)
+  (define-key ahg-status-mode-map "U" 'ahg-status-undo)
+  (define-key ahg-status-mode-map "!" 'ahg-status-do-command)
+  (define-key ahg-status-mode-map "l" 'ahg-short-log)
+  (define-key ahg-status-mode-map "f" 'ahg-status-visit-file)
+  (define-key ahg-status-mode-map "\r" 'ahg-status-visit-file)
+  (define-key ahg-status-mode-map "o" 'ahg-status-visit-file-other-window)
+  (let ((showmap (make-sparse-keymap)))
+    (define-key showmap "A" (lambda () (interactive) (ahg-status "-A")))
+    (define-key showmap "m" (lambda () (interactive) (ahg-status "-m")))
+    (define-key showmap "a" (lambda () (interactive) (ahg-status "-a")))
+    (define-key showmap "r" (lambda () (interactive) (ahg-status "-r")))
+    (define-key showmap "d" (lambda () (interactive) (ahg-status "-d")))
+    (define-key showmap "c" (lambda () (interactive) (ahg-status "-c")))
+    (define-key showmap "u" (lambda () (interactive) (ahg-status "-u")))
+    (define-key showmap "i" (lambda () (interactive) (ahg-status "-I")))
+    (define-key ahg-status-mode-map "s" showmap)))
+
+
+(defun ahg-status (&rest extra-switches)
+  "Run hg status. When called non-interactively, it is possible
+to pass extra switches to hg status."
+  (interactive)
+  (let* ((buf (get-buffer-create "*aHg-status*"))
+         (process (apply 'start-process-shell-command
+                         "aHg-status" buf "hg status" extra-switches)))
+    (set-process-sentinel process 'ahg-status-sentinel)
+    (with-current-buffer buf
+      (set (make-local-variable 'ahg-root) (ahg-root)))))
 
 (defun ahg-status-pp (data)
   "Pretty-printer for data elements in a *hg status* buffer."
@@ -83,7 +135,9 @@ the current dir is not under hg."
           (insert (propertize (concat status-code " " filename)
                               'face ahg-status-marked-face)))
       (insert (propertize (concat " " status-code " " filename)
-                          'face (ahg-face-from-status status-code))))))
+                          'face (ahg-face-from-status status-code)
+                          'mouse-face 'highlight
+                          'keymap ahg-status-line-map)))))
 
 
 (defun ahg-status-toggle-mark ()
@@ -214,39 +268,7 @@ the singleton list with the node at point."
                                         (process-buffer process)
                                       (ahg-status-maybe-refresh))
                                   (ahg-show-error process))))
-      (message "hg revert aborted"))))
-                         
-
-(define-derived-mode ahg-status-mode nil "aHg-status"
-  "Major mode for *hg status* buffers."
-  (toggle-read-only t)
-  (font-lock-mode nil)
-  (define-key ahg-status-mode-map "C-h" 'describe-mode)
-  (define-key ahg-status-mode-map " " 'ahg-status-toggle-mark)
-  (define-key ahg-status-mode-map "m" (lambda () (interactive)
-                                        (ahg-status-mark t)))
-  (define-key ahg-status-mode-map "u" (lambda () (interactive)
-                                        (ahg-status-mark nil)))
-  (define-key ahg-status-mode-map "c" 'ahg-status-commit)
-  (define-key ahg-status-mode-map "a" 'ahg-status-add)
-  (define-key ahg-status-mode-map "=" 'ahg-status-diff)
-  (define-key ahg-status-mode-map "D" 'ahg-status-diff-all)
-  (define-key ahg-status-mode-map "r" 'ahg-status-remove)
-  (define-key ahg-status-mode-map "g" 'ahg-status-refresh)
-  (define-key ahg-status-mode-map "q" 'ahg-buffer-quit)
-  (define-key ahg-status-mode-map "U" 'ahg-status-undo)
-  (define-key ahg-status-mode-map "!" 'ahg-command)
-  (define-key ahg-status-mode-map "l" 'ahg-short-log)
-  (let ((showmap (make-sparse-keymap)))
-    (define-key showmap "A" (lambda () (interactive) (ahg-status "-A")))
-    (define-key showmap "m" (lambda () (interactive) (ahg-status "-m")))
-    (define-key showmap "a" (lambda () (interactive) (ahg-status "-a")))
-    (define-key showmap "r" (lambda () (interactive) (ahg-status "-r")))
-    (define-key showmap "d" (lambda () (interactive) (ahg-status "-d")))
-    (define-key showmap "c" (lambda () (interactive) (ahg-status "-c")))
-    (define-key showmap "u" (lambda () (interactive) (ahg-status "-u")))
-    (define-key showmap "i" (lambda () (interactive) (ahg-status "-I")))
-    (define-key ahg-status-mode-map "s" showmap)))
+      (message "hg revert aborted"))))                         
 
 
 (defun ahg-get-status-ewoc (root)
@@ -303,16 +325,29 @@ ahg-status, and it has an ewoc associated with it."
       (pop-to-buffer buf)
       (message "Error in hg status: %s" (substring status 0 -1)))))
 
-(defun ahg-status (&rest extra-switches)
-  "Run hg status. When called non-interactively, it is possible
-to pass extra switches to hg status."
+
+(defun ahg-status-visit-file (&optional other-window)
   (interactive)
-  (let* ((buf (get-buffer-create "*aHg-status*"))
-         (process (apply 'start-process-shell-command
-                         "aHg-status" buf "hg status" extra-switches)))
-    (set-process-sentinel process 'ahg-status-sentinel)
-    (with-current-buffer buf
-      (set (make-local-variable 'ahg-root) (ahg-root)))))
+  (let* ((node (ewoc-locate ewoc))
+         (data (and node (ewoc-data node))))
+    (when data
+      (if other-window
+          (find-file-other-window (cddr data))
+        (find-file (cddr data))))))
+
+(defun ahg-status-visit-file-other-window ()
+  (interactive)
+  (ahg-status-visit-file t))
+
+
+(defun ahg-status-do-command ()
+  (interactive)
+  (let* ((files (ahg-status-get-marked nil)))
+    (if files
+        (let ((ahg-do-command-prompt "Hg command on selected files: ")
+              (ahg-do-command-extra-args (mapcar 'cddr files)))
+          (call-interactively 'ahg-do-command))
+      (call-interactively 'ahg-do-command))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg commit
@@ -359,7 +394,7 @@ to pass extra switches to hg status."
     (define-key map [?n] 'ahg-short-log-next)
     (define-key map [?p] 'ahg-short-log-previous)
     (define-key map [?q] 'ahg-buffer-quit)
-    (define-key map [?!] 'ahg-command)
+    (define-key map [?!] 'ahg-do-command)
     map)
   "Keymap used in `ahg-short-log-mode'.")
 
@@ -603,7 +638,7 @@ Commands:
   (define-key ahg-log-mode-map "\t" 'ahg-log-next)
   (define-key ahg-log-mode-map [?p] 'ahg-log-previous)
   (define-key ahg-log-mode-map [?q] 'ahg-buffer-quit)
-  (define-key ahg-log-mode-map [?!] 'ahg-command)
+  (define-key ahg-log-mode-map [?!] 'ahg-do-command)
   (set (make-local-variable 'font-lock-defaults)
        (list 'ahg-log-font-lock-keywords t nil nil)))
 
@@ -711,28 +746,47 @@ argument, don't ask for revisions."
          (prev (substring command 0 idx)))
     (mapcar (function (lambda (a) (concat prev a))) matches)))
 
-(defun ahg-command (cmdstring)
+
+(defvar ahg-do-command-prompt "Hg command: ")
+(defvar ahg-do-command-extra-args nil)
+(defvar ahg-do-command-insert-header t)
+
+(defun ahg-do-command (cmdstring)
   (interactive (list
                 (let ((minibuffer-local-completion-map
                        (copy-keymap minibuffer-local-map)))
                   (define-key minibuffer-local-completion-map "\t"
                     'minibuffer-complete)
-                  (completing-read "Hg command: "
+                  (completing-read ahg-do-command-prompt
                                    (dynamic-completion-table
                                     ahg-complete-command)))))
   (let* ((args (split-string cmdstring))
          (cmdname (car args))
-         (buffer (get-buffer-create (concat "*hg " cmdname ": "
+         (buffer (get-buffer-create (concat "*hg command: "
                                             (ahg-root) "*"))))
-    (ahg-generic-command cmdname (cdr args)
-                         (lambda (process status)
-                           (if (string= status "finished\n")
-                               (with-current-buffer (process-buffer process)
-                                 (beginning-of-buffer)
-                                 (ahg-command-mode)
-                                 (pop-to-buffer (current-buffer)))
-                             (ahg-show-error process)))
-                         buffer)))
+    (when ahg-do-command-extra-args
+      (setq args (append args ahg-do-command-extra-args)))
+    (ahg-generic-command
+     cmdname (cdr args)
+     (lambda (process status)
+       (if (string= status "finished\n")
+           (with-current-buffer (process-buffer process)
+             (beginning-of-buffer)
+             (ahg-command-mode)
+             (pop-to-buffer (current-buffer))
+             (when ahg-do-command-insert-header
+               (let ((inhibit-read-only t))
+                 (insert
+                  (propertize
+                   (concat "output of '"
+                           (mapconcat 'identity (process-command process) " ")
+                           "' on ")
+                   'face font-lock-comment-face)
+                  (propertize default-directory 'face font-lock-constant-face)
+                  "\n" (make-string (1- (window-width (selected-window))) ?-)
+                  "\n\n"))))
+         (ahg-show-error process)))
+     buffer)))
 
 ;;-----------------------------------------------------------------------------
 ;; Various helper functions
@@ -766,6 +820,7 @@ destination buffer. If nil, a new buffer will be used."
 (define-derived-mode ahg-command-mode nil "aHg command"
   "Major mode for aHg commands"
   (toggle-read-only t)
+  (font-lock-mode nil)
   (define-key ahg-command-mode-map "q" 'ahg-buffer-quit))
 
 ;; This is a cut&paste from dvc-capturing-lambda from the DVC package, and the
