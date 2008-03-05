@@ -142,7 +142,8 @@ command output." :group 'ahg :type 'boolean)
                       ["Status" ahg-status t]
                       ["Log Summary" ahg-short-log t]
                       ["Detailed Log" ahg-log t]
-                      ["Hg Command" ahg-do-command t])
+                      ["Execute Hg Command" ahg-do-command t]
+                      ["Help on Hg Command" ahg-command-help t])
                     "PCL-CVS")
 
 (defvar ahg-global-map
@@ -151,6 +152,7 @@ command output." :group 'ahg :type 'boolean)
     (define-key map "l" 'ahg-short-log)
     (define-key map "L" 'ahg-log)
     (define-key map "!" 'ahg-do-command)
+    (define-key map "h" 'ahg-command-help)
     map))
 (global-set-key ahg-global-key-prefix ahg-global-map)
 
@@ -232,6 +234,7 @@ Commands:
   (define-key ahg-status-mode-map "f" 'ahg-status-visit-file)
   (define-key ahg-status-mode-map "\r" 'ahg-status-visit-file)
   (define-key ahg-status-mode-map "o" 'ahg-status-visit-file-other-window)
+  (define-key ahg-status-mode-map "h" 'ahg-command-help)
   (let ((showmap (make-sparse-keymap)))
     (define-key showmap "A" 'ahg-status-show-all)
     (define-key showmap "m" 'ahg-status-show-modified)
@@ -276,6 +279,8 @@ Commands:
      ["Unknown" ahg-status-show-unknown [:keys "su" :active t]]
      ["Ignored" ahg-status-show-ignored [:keys "si" :active t]]
      )
+    ["--" nil nil]
+    ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
     ["Refresh" ahg-status-refresh [:keys "g" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]
@@ -591,6 +596,7 @@ ahg-status, and it has an ewoc associated with it."
     (define-key map [?p] 'ahg-short-log-previous)
     (define-key map [?q] 'ahg-buffer-quit)
     (define-key map [?!] 'ahg-do-command)
+    (define-key map [?h] 'ahg-command-help)
     map)
   "Keymap used in `ahg-short-log-mode'.")
 
@@ -627,6 +633,8 @@ Commands:
     ["Next Revision" ahg-short-log-next [:keys "n" :active t]]
     ["Previous Revision" ahg-short-log-previous [:keys "p" :active t]]
     ["Go To Revision..." ahg-short-log-goto-revision [:keys "r" :active t]]
+    ["--" nil nil]
+    ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
     ["Refresh" ahg-short-log [:keys "g" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]
@@ -839,6 +847,7 @@ Commands:
   (define-key ahg-log-mode-map [?p] 'ahg-log-previous)
   (define-key ahg-log-mode-map [?q] 'ahg-buffer-quit)
   (define-key ahg-log-mode-map [?!] 'ahg-do-command)
+  (define-key ahg-log-mode-map [?h] 'ahg-command-help)
   (set (make-local-variable 'font-lock-defaults)
        (list 'ahg-log-font-lock-keywords t nil nil))
   (easy-menu-add ahg-log-mode-menu ahg-log-mode-map))
@@ -852,6 +861,8 @@ Commands:
     ["--" nil nil]
     ["Next Revision" ahg-log-next [:keys "\t" :active t]]
     ["Previous Revision" ahg-log-previous [:keys "p" :active t]]
+    ["--" nil nil]
+    ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
     ["Refresh" ahg-log [:keys "g" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]
@@ -983,7 +994,7 @@ Commands:
 ;; hg command
 ;;-----------------------------------------------------------------------------
 
-(defun ahg-match-command (command)
+(defun ahg-complete-command-name (command)
   (with-temp-buffer
     (if (= (call-process "hg" nil t nil "help") 0)
         (let (out)
@@ -1010,8 +1021,11 @@ Commands:
   ;; we split the string, and treat the last word as a filename
   (let* ((idx (string-match "\\([^ ]+\\)$" command))
          (matches
-          (if (= idx 0) (ahg-match-command command)
-            (file-expand-wildcards (concat (substring command idx) "*"))))
+          (cond ((= idx 0) (ahg-complete-command-name command))
+                ((and (= idx 5) (string= (substring command 0 idx) "help "))
+                 (ahg-complete-command-name (substring command idx)))
+                (t (file-expand-wildcards
+                    (concat (substring command idx) "*")))))
          (prev (substring command 0 idx)))
     (mapcar (function (lambda (a) (concat prev a))) matches)))
 
@@ -1061,6 +1075,28 @@ Commands:
      buffer)))
 
 ;;-----------------------------------------------------------------------------
+;; hg help
+;;-----------------------------------------------------------------------------
+
+(defun ahg-command-help (command)
+  (interactive
+   (list (completing-read "Help on hg command: "
+                          (dynamic-completion-table
+                           ahg-complete-command-name))))
+  (let ((buffer (get-buffer-create "*hg help*")))
+    (with-current-buffer buffer (let ((inhibit-read-only t)) (erase-buffer)))
+    (ahg-generic-command
+     "help" (list command)
+     (lambda (process status)
+       (if (string= status "finished\n")
+           (progn
+             (pop-to-buffer (process-buffer process))
+             (help-mode)
+             (beginning-of-buffer))
+         (ahg-show-error process)))
+     buffer)))
+
+;;-----------------------------------------------------------------------------
 ;; Various helper functions
 ;;-----------------------------------------------------------------------------
 
@@ -1098,11 +1134,13 @@ Commands:
 "
   (toggle-read-only t)
   (font-lock-mode nil)
+  (define-key ahg-command-mode-map "h" 'ahg-command-help)
   (define-key ahg-command-mode-map "q" 'ahg-buffer-quit)
   (easy-menu-add ahg-command-mode-menu ahg-command-mode-map))
 
 (easy-menu-define ahg-command-mode-menu ahg-command-mode-map "aHg Command"
   '("aHg Command"
+    ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]))
 
 
