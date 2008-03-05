@@ -48,6 +48,10 @@ command output." :group 'ahg :type 'boolean)
   "If non-nil, when `ahg-buffer-quit' will restore the window configuration."
   :group 'ahg :type 'boolean)
 
+(defcustom ahg-diff-use-git-format t
+  "If non-nil, aHg commands that output a diff will use the git format."
+  :group 'ahg :type 'boolean)
+
 (defface ahg-status-marked-face
   '((default (:inherit font-lock-preprocessor-face)))
   "Face for marked files in aHg status buffers." :group 'ahg)
@@ -427,11 +431,12 @@ the singleton list with the node at point."
   (interactive)
   (let ((files (ahg-status-get-marked (if all 'all 'cur)))
         (buf (get-buffer-create "*aHg diff*"))
-        (inhibit-read-only t))
+        (inhibit-read-only t)
+        (args (when ahg-diff-use-git-format '("--git"))))
     (with-current-buffer buf
       (erase-buffer)
       (ahg-push-window-configuration))
-    (ahg-generic-command "diff" (mapcar 'cddr files)
+    (ahg-generic-command "diff" (append args (mapcar 'cddr files))
                          (lambda (process status)
                             (if (string= status "finished\n")
                                 (progn
@@ -976,6 +981,8 @@ Commands:
       (setq r2 (read-string "hg diff, R2: " ""))))
   (let ((buffer (get-buffer-create "*hg diff*"))
         (command-list (ahg-args-add-revs r1 r2 t)))
+    (when ahg-diff-use-git-format
+      (setq command-list (cons "--git" command-list)))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
@@ -983,10 +990,10 @@ Commands:
     (ahg-generic-command "diff" command-list
                          (lambda (process status)
                            (if (string= status "finished\n")
-                               (with-current-buffer (process-buffer process)
+                               (progn
+                                 (pop-to-buffer (process-buffer process))
                                  (ahg-diff-mode)
-                                 (beginning-of-buffer)
-                                 (pop-to-buffer (current-buffer)))
+                                 (beginning-of-buffer))
                              (ahg-show-error process)))
                          buffer)))
 
