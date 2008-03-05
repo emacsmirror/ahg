@@ -24,6 +24,7 @@
 (require 'diff-mode)
 (require 'easymenu)
 (require 'log-edit)
+(require 'cl)
 
 ;;-----------------------------------------------------------------------------
 ;; the global aHg menu and keymap
@@ -479,16 +480,9 @@ ahg-status, and it has an ewoc associated with it."
     (define-key map [mouse-2] 'ahg-short-log-view-details-mouse)
     map))
 
-(defvar ahg-short-log-font-lock-keywords
-  '(("^hg log for " . font-lock-comment-face)
-    ("^-+" . 'bold)
-    ("^ +Rev | .*" . 'bold)
-    ("^hg log for \\(.*\\)$" 1 font-lock-constant-face)
-    ("^ +\\([0-9]+\\)" 1 font-lock-function-name-face)
-    ("^[^|]+| \\([0-9][^|]+\\)|" 1 font-lock-string-face)
-    ("^\\([^|]+| \\)\\{2\\}\\([^|]+\\)|" 2 font-lock-type-face)
-    )
-  "Keywords in `ahg-short-log-mode' mode.")
+(defvar ahg-short-log-revision-face font-lock-function-name-face)
+(defvar ahg-short-log-date-face font-lock-string-face)
+(defvar ahg-short-log-user-face font-lock-type-face)
 
 (defconst ahg-short-log-start-regexp "^ +\\([0-9]+\\) |")
 
@@ -499,8 +493,7 @@ Commands:
 \\{ahg-short-log-mode-map}
 "
   (use-local-map ahg-short-log-mode-map)
-  (set (make-local-variable 'font-lock-defaults)
-       (list 'ahg-short-log-font-lock-keywords t nil nil)))
+  (font-lock-mode nil))
 
 (easy-menu-define ahg-short-log-mode-menu ahg-short-log-mode-map "aHg Short Log"
   '("aHg Short Log"
@@ -520,66 +513,55 @@ Commands:
 (easy-menu-add ahg-short-log-mode-menu ahg-short-log-mode-map)
 
 
-(defun ahg-short-log-format (output &optional width)
-  "Formats the output returned by hg log for displaying it in a short-log
-buffer (see `ahg-short-log' and `ahg-short-log-mode')."
-  (let ((lines (split-string output "\n")))
-    (unless width
-      (setq width (window-width (get-buffer-window (current-buffer)))))
-    (labels ((trim (n s) (if (> (length s) n) (substring s 0 n) s)))
+(defun ahg-short-log-pp (data)
+  "Pretty-printer for short log revisions."
+  ;; data is a 4-elements list
+  (labels ((trim (n s) (if (> (length s) n) (substring s 0 n) s)))
+    (let* ((width (window-width (selected-window)))
+           (p1 (car data))
+           (p2 (cadr data))
+           (p3 (caddr data))
+           (p4 (cadddr data))
+           (s (format "%7s | %s | %8s | %s"
+                      (propertize p1 'face ahg-short-log-revision-face)
+                      (propertize p2 'face ahg-short-log-date-face)
+                      (propertize (trim 8 p3) 'face ahg-short-log-user-face)
+                      p4))
+           (pad (if (< (length s) width)
+                    (make-string (- width (length s)) ? )
+                  "")))
+      (insert (propertize (concat s pad) 'mouse-face 'highlight
+                          'keymap ahg-short-log-line-map)))))
+        
+(defun ahg-short-log-insert-contents (ewoc contents)
+  (let ((lines (split-string contents "\n")))
     (labels ((format-line (line)
-                (if (and line (> (length line) 0))
+               (if (and line (> (length line) 0))
                     (let* ((p1 (string-match " " line))
                            (p2 (string-match " " line (1+ p1)))
                            (p3 (string-match " " line (1+ p2)))
-                           (s (format "%7s | %s | %8s | %s"
-                                      (substring line 0 p1)
-                                      (substring line (1+ p1) p2)
-                                      (trim 8 (substring line (1+ p2) p3))
-                                      (substring line (1+ p3))))
-                           (pad (if (< (length s) width)
-                                    (make-string (- width (length s)) ? )
-                                  "")))
-                      (concat s pad "\n"))
-                  "")))
-      (apply 'concat (mapcar 'format-line lines))))))
-
-
-(defun ahg-short-log-mode-setup-lines ()
-  "Sets up mouse navigation on short-log lines."
-  ;; setup the lines
-  (beginning-of-buffer)
-  (while (not (eobp))
-    (beginning-of-line)
-    (when (string-match ahg-short-log-start-regexp
-                        (buffer-substring (point-at-bol) (point-at-eol)))
-      (add-text-properties (point-at-bol) (point-at-eol)
-                           (list 'mouse-face 'highlight
-                                 'keymap ahg-short-log-line-map)))
-    (forward-line))
-  (beginning-of-buffer)
-  (ahg-short-log-next 1))
+                           (data (list
+                                  (substring line 0 p1)
+                                  (substring line (1+ p1) p2)
+                                  (substring line (1+ p2) p3)
+                                  (substring line (1+ p3)))))
+                      (ewoc-enter-last ewoc data)))))
+      (mapcar 'format-line lines))))
 
 
 (defun ahg-short-log-next (n)
   "Move to the next changeset line"
   (interactive "p")
-  (end-of-line)
-  (re-search-forward ahg-short-log-start-regexp nil t n)
-  (beginning-of-line))
+  (ewoc-goto-next ewoc n))
 
 (defun ahg-short-log-previous (n)
   "Move to the previous changeset line"
   (interactive "p")
-  (end-of-line)
-  (re-search-backward ahg-short-log-start-regexp)
-  (re-search-backward ahg-short-log-start-regexp nil t n))
+  (ewoc-goto-prev ewoc n))
 
 (defun ahg-short-log-revision-at-point ()
-  (save-excursion
-    (end-of-line)
-    (re-search-backward ahg-short-log-start-regexp)
-    (match-string-no-properties 1)))
+  (let ((node (ewoc-locate ewoc)))
+    (and node (car (ewoc-data node)))))
 
 (defun ahg-short-log-view-diff ()
   (interactive)
@@ -611,13 +593,11 @@ do nothing."
   (when (interactive-p)
     (unless rev
       (setq rev (read-string "Goto revision: "))))
-  (let ((rev-pos))
-    (save-excursion
-      (when
-          (re-search-forward (concat "^ +" rev " |") nil t)
-        (setq rev-pos (point))))
-    (when rev-pos
-      (goto-char rev-pos) (beginning-of-line))))
+  (let ((n (ewoc-nth ewoc 0)))
+    (while (and n (not (string= rev (car (ewoc-data n)))))
+      (setq n (ewoc-next ewoc n)))
+    (when n (ewoc-goto-node ewoc n))))
+
 
 (defun ahg-args-add-revs (r1 r2 &optional disjoint)
   (let (command-list)
@@ -638,6 +618,20 @@ do nothing."
                                             (append command-list
                                                     (list "-r" r2)))))
     command-list))
+
+
+(defun ahg-short-log-create-ewoc ()
+  (let* ((width (window-width (selected-window)))
+         (header (concat
+                  (propertize "hg log for " 'face font-lock-comment-face)
+                  (propertize default-directory 'face font-lock-constant-face)
+                  "\n\n" (propertize (make-string width ?-) 'face 'bold) "\n"
+                  (propertize "    Rev |    Date    |  Author  | Summary\n"
+                              'face 'bold)
+                  (propertize (make-string width ?-) 'face 'bold)))
+         (footer (propertize (make-string width ?-) 'face 'bold))
+         (ew (ewoc-create 'ahg-short-log-pp header footer)))
+    ew))
 
 (defun ahg-short-log (&optional r1 r2)
   "Run hg log, in a compressed format.
@@ -665,30 +659,18 @@ don't ask for revisions."
      (lambda (process status)
        (if (string= status "finished\n")
            (with-current-buffer (process-buffer process)
+             (pop-to-buffer (current-buffer))
              (ahg-short-log-mode)
-             (let ((inhibit-read-only t)
-                   (contents (buffer-string)))
+             (let ((contents (buffer-substring-no-properties
+                              (point-min) (point-max)))
+                   (inhibit-read-only t))
                (erase-buffer)
                (setq truncate-lines t)
-               (insert (ahg-short-log-format contents))
-               (goto-char (point-min))
-               (insert (format "hg log for %s\n\n"
-                               default-directory))
-               (let ((l (concat (make-string
-                                 (window-width
-                                  (get-buffer-window
-                                   (current-buffer))) ?-)
-                                "\n")))
-                 (insert l)
-                 (insert
-                  "    Rev |    Date    |  Author  | Summary\n")
-                 (insert l)
-                 (goto-char (point-max))
-                 (insert l))
-               (goto-line 6)
-               (ahg-short-log-mode-setup-lines)
-               (toggle-read-only 1))
-             (pop-to-buffer (current-buffer)))
+               (let ((ew (ahg-short-log-create-ewoc)))
+                 (ahg-short-log-insert-contents ew contents)
+                 (goto-line 6)
+                 (toggle-read-only 1)
+                 (set (make-local-variable 'ewoc) ew))))
          (ahg-show-error process)))
      buffer)))
 
