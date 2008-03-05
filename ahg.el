@@ -1018,7 +1018,6 @@ Commands:
 
 (defvar ahg-do-command-prompt "Hg command: ")
 (defvar ahg-do-command-extra-args nil)
-(defvar ahg-do-command-insert-header t)
 
 (defun ahg-do-command (cmdstring)
   (interactive (list
