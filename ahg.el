@@ -88,6 +88,10 @@ command output." :group 'ahg :type 'boolean)
   '((default (:inherit font-lock-string-face)))
   "Face for date field in aHg short log buffers." :group 'ahg)
 
+(defface ahg-log-revision-face
+  '((default (:inherit font-lock-variable-name-face)))
+  "Face for revision field in aHg log buffers." :group 'ahg)
+
 (defface ahg-log-field-face
   '((default (:inherit font-lock-function-name-face)))
   "Face for fields in aHg log buffers." :group 'ahg)
@@ -124,6 +128,7 @@ command output." :group 'ahg :type 'boolean)
 (defvar ahg-short-log-date-face 'ahg-short-log-date-face)
 (defvar ahg-log-field-face 'ahg-log-field-face)
 (defvar ahg-log-branch-face 'ahg-log-branch-face)
+(defvar ahg-log-revision-face 'ahg-log-revision-face)
 (defvar ahg-short-log-user-face 'ahg-short-log-user-face)
 (defvar ahg-header-line-face 'ahg-header-line-face)
 (defvar ahg-header-line-root-face 'ahg-header-line-root-face)
@@ -222,8 +227,8 @@ Commands:
   (define-key ahg-status-mode-map "q" 'ahg-buffer-quit)
   (define-key ahg-status-mode-map "U" 'ahg-status-undo)
   (define-key ahg-status-mode-map "!" 'ahg-status-do-command)
-  (define-key ahg-status-mode-map "l" 'ahg-short-log)
-  (define-key ahg-status-mode-map "L" 'ahg-log)
+  (define-key ahg-status-mode-map "l" 'ahg-status-short-log)
+  (define-key ahg-status-mode-map "L" 'ahg-status-log)
   (define-key ahg-status-mode-map "f" 'ahg-status-visit-file)
   (define-key ahg-status-mode-map "\r" 'ahg-status-visit-file)
   (define-key ahg-status-mode-map "o" 'ahg-status-visit-file-other-window)
@@ -516,12 +521,24 @@ ahg-status, and it has an ewoc associated with it."
 
 (defun ahg-status-do-command ()
   (interactive)
-  (let* ((files (ahg-status-get-marked nil)))
+  (let ((files (ahg-status-get-marked nil)))
     (if files
         (let ((ahg-do-command-prompt "Hg command on selected files: ")
               (ahg-do-command-extra-args (mapcar 'cddr files)))
           (call-interactively 'ahg-do-command))
       (call-interactively 'ahg-do-command))))
+
+(defun ahg-status-short-log ()
+  (interactive)
+  (let* ((files (ahg-status-get-marked nil))
+         (ahg-file-list-for-log-command (if files (mapcar 'cddr files) nil)))
+    (call-interactively 'ahg-short-log)))
+
+(defun ahg-status-log ()
+  (interactive)
+  (let* ((files (ahg-status-get-marked nil))
+         (ahg-file-list-for-log-command (if files (mapcar 'cddr files) nil)))
+    (call-interactively 'ahg-log)))
 
 ;;-----------------------------------------------------------------------------
 ;; hg commit
@@ -731,17 +748,23 @@ do nothing."
          (ew (ewoc-create 'ahg-short-log-pp header footer)))
     ew))
 
-(defun ahg-short-log (&optional r1 r2)
+(defvar ahg-file-list-for-log-command nil)
+
+(defun ahg-short-log (r1 r2)
   "Run hg log, in a compressed format.
 This displays the log in a tabular view, one line per
 changeset. The format of each line is: Revision | Date | User |
 Summary.  When run interactively with a positve prefix argument,
 don't ask for revisions."
-  (interactive "P")
-  (when (interactive-p)
-    (unless r1
-      (setq r1 (read-string "hg log, R1: " "tip"))
-      (setq r2 (read-string "hg log, R2: " "0"))))
+  (interactive
+   (list (read-string
+          (concat "hg log"
+                  (if ahg-file-list-for-log-command " (on selected files)" "")
+                  ", R1: ") "tip")
+         (read-string
+          (concat "hg log"
+                  (if ahg-file-list-for-log-command " (on selected files)" "")
+                  ", R2: ") "0")))
   (let ((buffer (get-buffer-create
                  (concat "*hg log (summary): " (ahg-root) "*")))
         (command-list (ahg-args-add-revs r1 r2)))  
@@ -749,6 +772,8 @@ don't ask for revisions."
           (append command-list
                   (list "--template"
                         "{rev} {date|shortdate} {author|user} {desc|firstline}\\n")))
+    (when ahg-file-list-for-log-command
+      (setq command-list (append command-list ahg-file-list-for-log-command)))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
@@ -786,7 +811,7 @@ don't ask for revisions."
     ("^branch:" . ahg-log-field-face)
     ("^parent:" . ahg-log-field-face)
     ("^description:" . ahg-log-field-face)
-    ("^\\(changeset\\|parent\\): +\\(.+\\)$" 2 ahg-short-log-revision-face)
+    ("^\\(changeset\\|parent\\): +\\(.+\\)$" 2 ahg-log-revision-face)
     ("^\\(tag\\|branch\\): +\\(.+\\)$" 2 ahg-log-branch-face)
     ("^user: +\\(.+\\)$" 1 ahg-short-log-user-face)
     ("^date: +\\(.+\\)$" 1 ahg-short-log-date-face)
@@ -872,18 +897,24 @@ buffer, do nothing."
     (when rev-pos
       (goto-char rev-pos))))
 
-(defun ahg-log (&optional r1 r2)
+(defun ahg-log (r1 r2)
   "Run hg log. When run interactively with a positve prefix
 argument, don't ask for revisions."
-  (interactive "P")
-  (when (interactive-p)
-    (unless r1
-      (setq r1 (read-string "hg log, R1: " "tip"))
-      (setq r2 (read-string "hg log, R2: " "0"))))
+  (interactive
+   (list (read-string
+          (concat "hg log"
+                  (if ahg-file-list-for-log-command " (on selected files)" "")
+                  ", R1: ") "tip")
+         (read-string
+          (concat "hg log"
+                  (if ahg-file-list-for-log-command " (on selected files)" "")
+                  ", R2: ") "0")))
   (let ((buffer (get-buffer-create
                  (concat "*hg log (details): " (ahg-root) "*")))
         (command-list (ahg-args-add-revs r1 r2)))  
     (setq command-list (append command-list (list "-v")))
+    (when ahg-file-list-for-log-command
+      (setq command-list (append command-list ahg-file-list-for-log-command)))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
@@ -898,7 +929,8 @@ argument, don't ask for revisions."
              (let ((inhibit-read-only t))
                (insert
                 (propertize "hg log for " 'face ahg-header-line-face)
-                (propertize default-directory 'face ahg-header-line-root-face)))
+                (propertize default-directory 'face ahg-header-line-root-face)
+                "\n\n"))
              (pop-to-buffer (current-buffer)))
          (ahg-show-error process)))
      buffer)))
