@@ -375,38 +375,37 @@ the singleton list with the node at point."
 
 (defun ahg-status-add ()
   (interactive)
-  (let* ((files (ahg-status-get-marked
-                 'all (lambda (data) (string= (cadr data) "?"))))
-         (howmany (length files)))
+  (let ((files (ahg-status-get-marked
+                'all (lambda (data) (string= (cadr data) "?")))))
     (if (yes-or-no-p (format "Add %d files to hg? " (length files)))
-        (ahg-generic-command "add" (mapcar 'cddr files)
-                             (ahg-capturing-lambda (process status)
-                                (if (string= status "finished\n")
-                                    (with-current-buffer
-                                        (process-buffer process)
-                                      (ahg-status-maybe-refresh)
-                                      (message "Added %d files"
-                                               (capture howmany)))
-                                  (ahg-show-error process))))
+        (ahg-generic-command
+         "add" (mapcar 'cddr files)
+         (lexical-let ((howmany (length files)))
+           (lambda (process status)
+             (if (string= status "finished\n")
+                 (with-current-buffer
+                     (process-buffer process)
+                   (ahg-status-maybe-refresh)
+                   (message "Added %d files" howmany))
+               (ahg-show-error process)))))
       (message "hg add aborted"))))
 
 (defun ahg-status-remove ()
   (interactive)
-  (let* ((files (ahg-status-get-marked
+  (let ((files (ahg-status-get-marked
                  'all (lambda (data)
                         (let ((f (cadr data)))
-                          (or (string= f "A") (string= f "C"))))))
-         (howmany (length files)))
+                          (or (string= f "A") (string= f "C")))))))
     (if (yes-or-no-p (format "Remove %d files from hg? " (length files)))
-        (ahg-generic-command "remove" (mapcar 'cddr files)
-                             (ahg-capturing-lambda (process status)
-                                (if (string= status "finished\n")
-                                    (with-current-buffer
-                                        (process-buffer process)
-                                      (ahg-status-maybe-refresh)
-                                      (message "Removed %d files"
-                                               (capture howmany)))
-                                  (ahg-show-error process))))
+        (ahg-generic-command
+         "remove" (mapcar 'cddr files)
+         (lexical-let ((howmany (length files)))
+           (lambda (process status)
+             (if (string= status "finished\n")
+                 (with-current-buffer (process-buffer process)
+                   (ahg-status-maybe-refresh)
+                   (message "Removed %d files" howmany))
+               (ahg-show-error process)))))
       (message "hg remove aborted"))))
 
 (defun ahg-status-refresh ()
@@ -554,13 +553,14 @@ ahg-status, and it has an ewoc associated with it."
   (let ((msg (buffer-string)))
     (let ((args (append (list "-m" msg)
                         (log-edit-files))))
-      (ahg-generic-command "commit" args
-                           (ahg-capturing-lambda (process status)
-                              (if (string= status "finished\n")
-                                  (let ((buf (ahg-get-status-buffer
-                                              (capture (ahg-root)))))
-                                    (when buf (ahg-status)))
-                                (ahg-show-error process))))))
+      (ahg-generic-command
+       "commit" args
+       (lexical-let ((aroot (ahg-root)))
+         (lambda (process status)
+           (if (string= status "finished\n")
+               (let ((buf (ahg-get-status-buffer aroot)))
+                 (when buf (ahg-status)))
+             (ahg-show-error process)))))))
   (kill-buffer (current-buffer)))
 
 (defun ahg-commit (files)
@@ -571,7 +571,7 @@ ahg-status, and it has an ewoc associated with it."
      'ahg-commit-callback
      nil
      (list (cons 'log-edit-listfun
-                 (ahg-capturing-lambda () (capture files))))
+                 (lexical-let ((flist files)) (lambda () flist))))
      buf)))
 
 ;;-----------------------------------------------------------------------------
@@ -1116,61 +1116,6 @@ Commands:
   (when (and ahg-restore-window-configuration-on-quit
              (boundp 'ahg-window-configuration))
     (set-window-configuration ahg-window-configuration)))
-
-;; This is a cut&paste from dvc-capturing-lambda from the DVC package, and the
-;; code is Copyright (C) by Matthieu Moy
-
-(eval-and-compile
-  (defvar ahg-gensym-counter 0)
-
-  (defun ahg-gensym (&optional arg)
-    "Generate a new uninterned symbol.
-    The name is made by appending a number to PREFIX, default
-\"dvc\"."
-    (let* ((prefix (if (stringp arg) arg "ahg-gensym-uniq-"))
-           (num (if (integerp arg) arg
-                  (prog1
-                      ahg-gensym-counter
-                    (setq ahg-gensym-counter (1+
-                                               ahg-gensym-counter)))))
-           (symbol (make-symbol (format "%s%d" prefix num))))
-      (eval `(defvar ,symbol nil "lint trap"))
-      symbol))
-
-
-  (defun ahg-capturing-lambda-helper (l)
-    (cond ((atom l) l)
-          ((eq (car l) 'capture)
-           (let ((g (ahg-gensym)))
-             (push (list g (cadr l)) captured-values)
-             g))
-          (t (mapcar 'ahg-capturing-lambda-helper l))))
-
-  (defmacro ahg-capturing-lambda (args &rest body)
-    "A `lambda' capable of capturing values from its defining
-environment.
-    Values to be captured should be surrounded by (capture ...).
-    For example:
-
-      (let* ((x 'lexical-x)
-             (y 'lexical-y)
-             (l (ahg-capturing-lambda (arg)
-                  (list x (capture y) arg))))
-        (let ((y 'dynamic-y)
-              (x 'dynamic-x))
-          (funcall l 'arg)))
-
-    => (dynamic-x lexical-y 'arg)
-    "
-    (let ((captured-values '()))
-      (let ((body (ahg-capturing-lambda-helper body)))
-        (` (` (lambda (, (quote (, args)))
-                (let ( (, (,@ (mapcar (lambda (var)
-                                        (` (list '(, (car var))
-                                                 (list 'quote (, (cadr var))))))
-                                      captured-values))))
-                  (funcall (, (lambda () . (, body)))))))))))
-  )
 
 
 (provide 'ahg)
