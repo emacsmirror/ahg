@@ -631,20 +631,23 @@ do nothing."
           ((and r1 (> (length r1) 0)) (setq command-list
                                  (append command-list (list "-r" r1))))
           ((and r2 (> (length r2) 0)) (setq command-list
-                                            (append command-list (list "-r" r2)))))
+                                            (append command-list
+                                                    (list "-r" r2)))))
     command-list))
 
 (defun ahg-short-log (&optional r1 r2)
   "Run hg log, in a compressed format.
-This displays the log in a tabular view, one line per changeset. The format of
-each line is: Revision | Date | User | Summary.
-When run interactively with a positve prefix argument, don't ask for revisions."
+This displays the log in a tabular view, one line per
+changeset. The format of each line is: Revision | Date | User |
+Summary.  When run interactively with a positve prefix argument,
+don't ask for revisions."
   (interactive "P")
   (when (interactive-p)
     (unless r1
       (setq r1 (read-string "hg log, R1: " "tip"))
       (setq r2 (read-string "hg log, R2: " "0"))))
-  (let ((buffer (get-buffer-create (concat "*hg log (summary): " (ahg-root) "*")))
+  (let ((buffer (get-buffer-create
+                 (concat "*hg log (summary): " (ahg-root) "*")))
         (command-list (ahg-args-add-revs r1 r2)))  
     (setq command-list
           (append command-list
@@ -653,43 +656,37 @@ When run interactively with a positve prefix argument, don't ask for revisions."
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)))
-    (ahg-generic-command "log" command-list
-                         (lambda (process status)
-                            (if (string= status "finished\n")
-                                (with-current-buffer (process-buffer process)
-                                  (ahg-short-log-mode)
-                                  (let ((inhibit-read-only t)
-                                        (contents (buffer-string)))
-                                    (erase-buffer)
-                                    (setq truncate-lines t)
-                                    (insert (ahg-short-log-format contents))
-                                    (goto-char (point-min))
-                                    (insert (format "hg log for %s\n\n" default-directory))
-                                    (let ((l (concat (make-string
-                                                      (window-width (get-buffer-window
-                                                                     (current-buffer))) ?-) "\n")))
-                                      (insert l)
-                                      (insert "    Rev |    Date    |  Author  | Summary\n")
-                                      (insert l)
-                                      (goto-char (point-max))
-                                      (insert l))
-                                    (goto-line 6)
-                                    (ahg-short-log-mode-setup-lines)
-                                    (toggle-read-only 1))
-                                  (pop-to-buffer (current-buffer)))
-                              (ahg-show-error process)))
-                         buffer)))
-
-
-(defvar ahg-log-mode-map
-  (let ((map (copy-keymap diff-mode-shared-map)))
-
-    ;; the merge group
-    (define-key map (dvc-prefix-merge ?u) 'dvc-update)
-    (define-key map (dvc-prefix-merge ?f) 'dvc-pull) ;; hint: fetch, p is reserved for push
-    (define-key map (dvc-prefix-merge ?m) 'dvc-missing)
-    map)
-  "Keymap used in `ahg-log-mode'.")
+    (ahg-generic-command
+     "log" command-list
+     (lambda (process status)
+       (if (string= status "finished\n")
+           (with-current-buffer (process-buffer process)
+             (ahg-short-log-mode)
+             (let ((inhibit-read-only t)
+                   (contents (buffer-string)))
+               (erase-buffer)
+               (setq truncate-lines t)
+               (insert (ahg-short-log-format contents))
+               (goto-char (point-min))
+               (insert (format "hg log for %s\n\n"
+                               default-directory))
+               (let ((l (concat (make-string
+                                 (window-width
+                                  (get-buffer-window
+                                   (current-buffer))) ?-)
+                                "\n")))
+                 (insert l)
+                 (insert
+                  "    Rev |    Date    |  Author  | Summary\n")
+                 (insert l)
+                 (goto-char (point-max))
+                 (insert l))
+               (goto-line 6)
+               (ahg-short-log-mode-setup-lines)
+               (toggle-read-only 1))
+             (pop-to-buffer (current-buffer)))
+         (ahg-show-error process)))
+     buffer)))
 
 
 (defvar ahg-log-font-lock-keywords
@@ -712,10 +709,7 @@ When run interactively with a positve prefix argument, don't ask for revisions."
   "Keywords in `ahg-log-mode' mode.")
 
 (define-derived-mode ahg-log-mode nil "ahg-log"
-  "Major mode to display hg log output with embedded diffs. Derives from `diff-mode'.
-
-Commands:
-\\{ahg-log-mode-map}
+  "Major mode to display hg log output.
 "
   (toggle-read-only t)
   (define-key ahg-log-mode-map (kbd "C-h") 'describe-mode)
@@ -780,7 +774,8 @@ Commands:
 
 
 (defun ahg-log-goto-revision (rev)
-  "Move point to the revision REV. If REV is not found in the log buffer, do nothing."
+  "Move point to the revision REV. If REV is not found in the log
+buffer, do nothing."
   (let ((rev-pos))
     (save-excursion
       (when
@@ -797,7 +792,8 @@ argument, don't ask for revisions."
     (unless r1
       (setq r1 (read-string "hg log, R1: " "tip"))
       (setq r2 (read-string "hg log, R2: " "0"))))
-  (let ((buffer (get-buffer-create (concat "*hg log (details): " (ahg-root) "*")))
+  (let ((buffer (get-buffer-create
+                 (concat "*hg log (details): " (ahg-root) "*")))
         (command-list (ahg-args-add-revs r1 r2)))  
     (setq command-list (append command-list (list "-v")))
     (with-current-buffer buffer
@@ -843,10 +839,35 @@ argument, don't ask for revisions."
 ;; hg command
 ;;-----------------------------------------------------------------------------
 
+(defun ahg-match-command (command)
+  (with-temp-buffer
+    (if (= (call-process "hg" nil t nil "help") 0)
+        (let (out)
+          (beginning-of-buffer)
+          (search-forward "list of commands:")
+          (beginning-of-line)
+          (forward-line 2)
+          (while (not (or (looking-at "^$") (eobp)))
+            (forward-char 1)
+            (let* ((pt (point))
+                   (cmd (buffer-substring-no-properties
+                         pt (progn (forward-word) (point))))
+                   (ok (compare-strings command 0 nil cmd 0 nil)))
+              (when (or (eq ok t) (= (- ok) (1+ (length command))))
+                (setq out (cons cmd out)))
+            (beginning-of-line)
+            (forward-line 1)))
+          (if out (nreverse out) (list command)))
+      ;; here, we silently ignore errors, and return the command itself as a
+      ;; match
+      (list command))))
+
 (defun ahg-complete-command (command)
   ;; we split the string, and treat the last word as a filename
   (let* ((idx (string-match "\\([^ \\t]+\\)$" command))
-         (matches (file-expand-wildcards (concat (substring command idx) "*")))
+         (matches
+          (if (= idx 0) (ahg-match-command command)
+            (file-expand-wildcards (concat (substring command idx) "*"))))
          (prev (substring command 0 idx)))
     (mapcar (function (lambda (a) (concat prev a))) matches)))
 
@@ -927,6 +948,12 @@ destination buffer. If nil, a new buffer will be used."
   (font-lock-mode nil)
   (define-key ahg-command-mode-map "q" 'ahg-buffer-quit))
 
+(easy-menu-define ahg-command-mode-menu ahg-command-mode-map "aHg Command"
+  '("aHg Command"
+    ["Quit" ahg-buffer-quit [:keys "q" :active t]]))
+(easy-menu-add ahg-command-mode-menu ahg-command-mode-map)
+
+
 ;; This is a cut&paste from dvc-capturing-lambda from the DVC package, and the
 ;; code is Copyright (C) by Matthieu Moy
 
@@ -981,3 +1008,6 @@ environment.
                                       captured-values))))
                   (funcall (, (lambda () . (, body)))))))))))
   )
+
+
+(provide 'ahg)
