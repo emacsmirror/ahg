@@ -186,7 +186,8 @@ to pass extra switches to hg status."
                          "aHg-status" buf "hg status" extra-switches)))
     (set-process-sentinel process 'ahg-status-sentinel)
     (with-current-buffer buf
-      (set (make-local-variable 'ahg-root) (ahg-root)))))
+      (set (make-local-variable 'ahg-root) (ahg-root))
+      (ahg-push-window-configuration))))
 
 (defun ahg-status-pp (data)
   "Pretty-printer for data elements in a *hg status* buffer."
@@ -314,15 +315,16 @@ the singleton list with the node at point."
   (let ((files (ahg-status-get-marked (if all 'all 'cur)))
         (buf (get-buffer-create "*aHg diff*"))
         (inhibit-read-only t))
-    (with-current-buffer buf (erase-buffer))
+    (with-current-buffer buf
+      (erase-buffer)
+      (ahg-push-window-configuration))
     (ahg-generic-command "diff" (mapcar 'cddr files)
                          (lambda (process status)
                             (if (string= status "finished\n")
                                 (progn
                                   (pop-to-buffer (process-buffer process))
-                                  (diff-mode)
+                                  (ahg-diff-mode)
                                   (set-buffer-modified-p nil)
-                                  (view-mode)
                                   (beginning-of-buffer))
                               (ahg-show-error process)))
                          buf)))
@@ -377,7 +379,8 @@ ahg-status, and it has an ewoc associated with it."
       (let* ((buf (process-buffer process))
              (root (with-current-buffer buf ahg-root))
              (ew (ahg-get-status-ewoc root))
-             (outbuf (ewoc-buffer ew)))
+             (outbuf (ewoc-buffer ew))
+             (cfg (with-current-buffer buf ahg-window-configuration)))
         (with-current-buffer buf
           (beginning-of-buffer)
           (while (not (eobp))
@@ -389,6 +392,7 @@ ahg-status, and it has an ewoc associated with it."
             (forward-line 1)))
         (kill-buffer buf)
         (pop-to-buffer outbuf)
+        (set (make-local-variable 'ahg-window-configuration) cfg)
         (let ((inhibit-read-only t)
               (node (ewoc-nth ew 0)))
           (ewoc-refresh ew)
@@ -653,7 +657,8 @@ don't ask for revisions."
                         "{rev} {date|shortdate} {author|user} {desc|firstline}\\n")))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
-        (erase-buffer)))
+        (erase-buffer)
+        (ahg-push-window-configuration)))
     (ahg-generic-command
      "log" command-list
      (lambda (process status)
@@ -787,7 +792,8 @@ argument, don't ask for revisions."
     (setq command-list (append command-list (list "-v")))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
-        (erase-buffer)))
+        (erase-buffer)
+        (ahg-push-window-configuration)))
     (ahg-generic-command "log" command-list
                          (lambda (process status)
                             (if (string= status "finished\n")
@@ -802,6 +808,19 @@ argument, don't ask for revisions."
 ;; hg diff
 ;;-----------------------------------------------------------------------------
 
+(define-derived-mode ahg-diff-mode diff-mode "aHg Diff"
+  "Special Diff mode for aHg buffers.
+
+Commands:
+\\{ahg-diff-mode-map}
+"
+  (toggle-read-only t)
+  (define-key ahg-diff-mode-map "q" 'ahg-buffer-quit)
+  (easy-menu-add-item nil '("Diff") '["--" nil nil])
+  (easy-menu-add-item nil '("Diff") '["Quit" ahg-buffer-quit
+                                      [:keys "q" :active t]]))
+
+
 (defun ahg-diff (&optional r1 r2)
   (interactive "P")
   (when (interactive-p)
@@ -812,13 +831,13 @@ argument, don't ask for revisions."
         (command-list (ahg-args-add-revs r1 r2 t)))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
-        (erase-buffer)))
+        (erase-buffer)
+        (ahg-push-window-configuration)))
     (ahg-generic-command "diff" command-list
                          (lambda (process status)
                            (if (string= status "finished\n")
                                (with-current-buffer (process-buffer process)
-                                 (diff-mode)
-                                 (view-mode)
+                                 (ahg-diff-mode)
                                  (beginning-of-buffer)
                                  (pop-to-buffer (current-buffer)))
                              (ahg-show-error process)))
@@ -880,6 +899,10 @@ argument, don't ask for revisions."
                                             (ahg-root) "*"))))
     (when ahg-do-command-extra-args
       (setq args (append args ahg-do-command-extra-args)))
+    (with-current-buffer buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (ahg-push-window-configuration)))
     (ahg-generic-command
      cmdname (cdr args)
      (lambda (process status)
@@ -906,10 +929,15 @@ argument, don't ask for revisions."
 ;; Various helper functions
 ;;-----------------------------------------------------------------------------
 
+;; (defun ahg-buffer-quit ()
+;;   (interactive)
+;;   (kill-buffer (current-buffer))
+;;   (or (one-window-p) (delete-window)))
 (defun ahg-buffer-quit ()
   (interactive)
-  (kill-buffer (current-buffer))
-  (or (one-window-p) (delete-window)))
+  (let ((buf (current-buffer)))
+    (ahg-pop-window-configuration)
+    (kill-buffer buf)))
 
 (defun ahg-generic-command (command args sentinel &optional buffer)
   "Executes then given hg command, with the given
@@ -946,6 +974,15 @@ Commands:
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]))
 (easy-menu-add ahg-command-mode-menu ahg-command-mode-map)
 
+
+(defun ahg-push-window-configuration ()
+  (set (make-local-variable 'ahg-window-configuration)
+       (current-window-configuration))
+  (put 'ahg-window-configuration 'permanent-local t))
+
+(defun ahg-pop-window-configuration ()
+  (when (boundp 'ahg-window-configuration)
+    (set-window-configuration ahg-window-configuration)))
 
 ;; This is a cut&paste from dvc-capturing-lambda from the DVC package, and the
 ;; code is Copyright (C) by Matthieu Moy
