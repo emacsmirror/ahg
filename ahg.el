@@ -102,6 +102,7 @@ the current dir is not under hg."
   (gethash status-code ahg-face-status-hash 'default))
 
 
+
 (define-derived-mode ahg-status-mode nil "aHg-status"
   "Major mode for *hg status* buffers.
 
@@ -137,7 +138,8 @@ Commands:
     (define-key showmap "c" 'ahg-status-show-clean)
     (define-key showmap "u" 'ahg-status-show-unknown)
     (define-key showmap "i" 'ahg-status-show-ignored)
-    (define-key ahg-status-mode-map "s" showmap)))
+    (define-key ahg-status-mode-map "s" showmap))
+  (easy-menu-add ahg-status-mode-menu ahg-status-mode-map))
 
 (easy-menu-define ahg-status-mode-menu ahg-status-mode-map "aHg Status"
   '("aHg Status"
@@ -174,7 +176,6 @@ Commands:
     ["Refresh" ahg-status-refresh [:keys "g" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]
     ))
-(easy-menu-add ahg-status-mode-menu ahg-status-mode-map)
 
 
 (defun ahg-status (&rest extra-switches)
@@ -398,12 +399,7 @@ ahg-status, and it has an ewoc associated with it."
           (ewoc-refresh ew)
           (when node (goto-char (ewoc-location node)))))
     ;; error, we signal it and pop to the buffer
-    (let ((buf (process-buffer process)))
-      (with-current-buffer buf
-        (goto-char (point-min))
-        (view-mode))
-      (pop-to-buffer buf)
-      (message "Error in hg status: %s" (substring status 0 -1)))))
+    (ahg-show-error process)))
 
 
 (defun ahg-status-visit-file (&optional other-window)
@@ -497,7 +493,8 @@ Commands:
 \\{ahg-short-log-mode-map}
 "
   (use-local-map ahg-short-log-mode-map)
-  (font-lock-mode nil))
+  (font-lock-mode nil)
+  (easy-menu-add ahg-short-log-mode-menu ahg-short-log-mode-map))
 
 (easy-menu-define ahg-short-log-mode-menu ahg-short-log-mode-map "aHg Short Log"
   '("aHg Short Log"
@@ -514,7 +511,6 @@ Commands:
     ["Refresh" ahg-short-log [:keys "g" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]
     ))
-(easy-menu-add ahg-short-log-mode-menu ahg-short-log-mode-map)
 
 
 (defun ahg-short-log-pp (data)
@@ -716,7 +712,8 @@ Commands:
   (define-key ahg-log-mode-map [?q] 'ahg-buffer-quit)
   (define-key ahg-log-mode-map [?!] 'ahg-do-command)
   (set (make-local-variable 'font-lock-defaults)
-       (list 'ahg-log-font-lock-keywords t nil nil)))
+       (list 'ahg-log-font-lock-keywords t nil nil))
+  (easy-menu-add ahg-log-mode-menu ahg-log-mode-map))
 
 (easy-menu-define ahg-log-mode-menu ahg-log-mode-map "aHg Log"
   '("aHg Log"
@@ -731,7 +728,6 @@ Commands:
     ["Refresh" ahg-log [:keys "g" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]
     ))
-(easy-menu-add ahg-log-mode-menu ahg-log-mode-map)
 
 
 (defconst ahg-log-start-regexp "^changeset: +\\([0-9]+:[0-9a-f]+\\)")
@@ -967,12 +963,12 @@ Commands:
 "
   (toggle-read-only t)
   (font-lock-mode nil)
-  (define-key ahg-command-mode-map "q" 'ahg-buffer-quit))
+  (define-key ahg-command-mode-map "q" 'ahg-buffer-quit)
+  (easy-menu-add ahg-command-mode-menu ahg-command-mode-map))
 
 (easy-menu-define ahg-command-mode-menu ahg-command-mode-map "aHg Command"
   '("aHg Command"
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]))
-(easy-menu-add ahg-command-mode-menu ahg-command-mode-map)
 
 
 (defun ahg-push-window-configuration ()
