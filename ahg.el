@@ -928,15 +928,15 @@ argument, don't ask for revisions."
      "log" command-list
      (lambda (process status)
        (if (string= status "finished\n")
-           (with-current-buffer (process-buffer process)
+           (progn
+             (pop-to-buffer (process-buffer process))
              (ahg-log-mode)
              (beginning-of-buffer)
              (let ((inhibit-read-only t))
                (insert
                 (propertize "hg log for " 'face ahg-header-line-face)
                 (propertize default-directory 'face ahg-header-line-root-face)
-                "\n\n"))
-             (pop-to-buffer (current-buffer)))
+                "\n\n")))
          (ahg-show-error process)))
      buffer)))
 
