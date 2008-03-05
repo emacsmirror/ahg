@@ -40,37 +40,93 @@
   "Prefix of globally-available aHg commands."
   :group 'ahg :type 'string)
 
+(defcustom ahg-do-command-insert-header t
+  "If non-nil, `ahg-do-command' will insert a header line in the
+command output." :group 'ahg :type 'boolean)
+
+(defcustom ahg-restore-window-configuration-on-quit t
+  "If non-nil, when `ahg-buffer-quit' will restore the window configuration."
+  :group 'ahg :type 'boolean)
+
 (defface ahg-status-marked-face
-  '((t '(:inherit font-lock-preprocessor-face)))
-  "Face for marked files in aHg status buffers.")
+  '((default (:inherit font-lock-preprocessor-face)))
+  "Face for marked files in aHg status buffers." :group 'ahg)
 
 (defface ahg-status-modified-face
-  '((t '(:inherit font-lock-function-name-face)))
-  "Face for modified files in aHg status buffers.")
+  '((default (:inherit font-lock-function-name-face)))
+  "Face for modified files in aHg status buffers." :group 'ahg)
 
 (defface ahg-status-added-face
-  '((t '(:inherit font-lock-type-face)))
-  "Face for added files in aHg status buffers.")
+  '((default (:inherit font-lock-type-face)))
+  "Face for added files in aHg status buffers." :group 'ahg)
 
 (defface ahg-status-removed-face
-  '((t '(:inherit font-lock-constant-face)))
-  "Face for removed files in aHg status buffers.")
+  '((default (:inherit font-lock-constant-face)))
+  "Face for removed files in aHg status buffers." :group 'ahg)
 
 (defface ahg-status-clean-face
-  '((t '(:inherit 'default)))
-  "Face for clean files in aHg status buffers.")
+  '((default (:inherit default)))
+  "Face for clean files in aHg status buffers." :group 'ahg)
 
 (defface ahg-status-deleted-face
-  '((t '(:inherit font-lock-string-face)))
-  "Face for deleted files in aHg status buffers.")
+  '((default (:inherit font-lock-string-face)))
+  "Face for deleted files in aHg status buffers." :group 'ahg)
 
 (defface ahg-status-ignored-face
-  '((t '(:inherit font-lock-comment-face)))
-  "Face for ignored files in aHg status buffers.")
+  '((default (:inherit font-lock-comment-face)))
+  "Face for ignored files in aHg status buffers." :group 'ahg)
 
 (defface ahg-status-unknown-face
-  '((t '(:inherit font-lock-variable-name-face)))
-  "Face for unknown files in aHg status buffers.")
+  '((default (:inherit font-lock-variable-name-face)))
+  "Face for unknown files in aHg status buffers." :group 'ahg)
+
+(defface ahg-short-log-revision-face
+  '((default (:inherit font-lock-function-name-face)))
+  "Face for revision field in aHg short log buffers." :group 'ahg)
+
+(defface ahg-short-log-date-face
+  '((default (:inherit font-lock-string-face)))
+  "Face for date field in aHg short log buffers." :group 'ahg)
+
+(defface ahg-log-field-face
+  '((default (:inherit font-lock-function-name-face)))
+  "Face for fields in aHg log buffers." :group 'ahg)
+
+(defface ahg-log-branch-face
+  '((default (:inherit font-lock-keyword-face)))
+  "Face for tags and branches in aHg log buffers." :group 'ahg)
+
+(defface ahg-short-log-user-face
+  '((default (:inherit font-lock-type-face)))
+  "Face for user field in aHg short log buffers." :group 'ahg)
+
+(defface ahg-header-line-face
+  '((default (:inherit font-lock-comment-face)))
+  "Face for header lines in aHg buffers." :group 'ahg)
+
+(defface ahg-header-line-root-face
+  '((default (:inherit font-lock-constant-face)))
+  "Face for repository path in header lines of aHg buffers." :group 'ahg)
+
+;;-----------------------------------------------------------------------------
+;; Variable definitions for faces
+;;-----------------------------------------------------------------------------
+
+(defvar ahg-status-marked-face 'ahg-status-marked-face)
+(defvar ahg-status-modified-face 'ahg-status-modified-face)
+(defvar ahg-status-added-face 'ahg-status-added-face)
+(defvar ahg-status-removed-face 'ahg-status-removed-face)
+(defvar ahg-status-clean-face 'ahg-status-clean-face)
+(defvar ahg-status-deleted-face 'ahg-status-deleted-face)
+(defvar ahg-status-ignored-face 'ahg-status-ignored-face)
+(defvar ahg-status-unknown-face 'ahg-status-unknown-face)
+(defvar ahg-short-log-revision-face 'ahg-short-log-revision-face)
+(defvar ahg-short-log-date-face 'ahg-short-log-date-face)
+(defvar ahg-log-field-face 'ahg-log-field-face)
+(defvar ahg-log-branch-face 'ahg-log-branch-face)
+(defvar ahg-short-log-user-face 'ahg-short-log-user-face)
+(defvar ahg-header-line-face 'ahg-header-line-face)
+(defvar ahg-header-line-root-face 'ahg-header-line-root-face)
 
 ;;-----------------------------------------------------------------------------
 ;; the global aHg menu and keymap
@@ -122,15 +178,6 @@ the current dir is not under hg."
 ;;-----------------------------------------------------------------------------
 ;; hg status
 ;;-----------------------------------------------------------------------------
-
-;;(defvar ahg-status-marked-face font-lock-preprocessor-face)
-;; (defvar ahg-status-modified-face font-lock-function-name-face)
-;; (defvar ahg-status-added-face font-lock-type-face)
-;; (defvar ahg-status-removed-face font-lock-constant-face)
-;; (defvar ahg-status-clean-face 'default)
-;; (defvar ahg-status-deleted-face font-lock-string-face)
-;; (defvar ahg-status-ignored-face font-lock-comment-face)
-;; (defvar ahg-status-unknown-face font-lock-variable-name-face)
 
 (defvar ahg-face-status-hash
   (let* ((test (define-hash-table-test 'ahg-str-hash 'string= 'sxhash))
@@ -407,8 +454,8 @@ ahg-status, and it has an ewoc associated with it."
   (let ((buf (get-buffer-create (concat "*hg status: " root "*")))
         (inhibit-read-only t)
         (header (concat
-                 (propertize "hg status for " 'face font-lock-comment-face)
-                 (propertize root 'face font-lock-constant-face) "\n"))
+                 (propertize "hg status for " 'face ahg-header-line-face)
+                 (propertize root 'face ahg-header-line-root-face) "\n"))
         (footer (concat "\n"
                         (make-string (1- (window-width (selected-window))) ?-)
                         "\nId: " (ahg-identify root))))
@@ -531,9 +578,9 @@ ahg-status, and it has an ewoc associated with it."
     (define-key map [mouse-2] 'ahg-short-log-view-details-mouse)
     map))
 
-(defvar ahg-short-log-revision-face font-lock-function-name-face)
-(defvar ahg-short-log-date-face font-lock-string-face)
-(defvar ahg-short-log-user-face font-lock-type-face)
+;; (defvar ahg-short-log-revision-face font-lock-function-name-face)
+;; (defvar ahg-short-log-date-face font-lock-string-face)
+;; (defvar ahg-short-log-user-face font-lock-type-face)
 
 (defconst ahg-short-log-start-regexp "^ +\\([0-9]+\\) |")
 
@@ -674,8 +721,8 @@ do nothing."
 (defun ahg-short-log-create-ewoc ()
   (let* ((width (window-width (selected-window)))
          (header (concat
-                  (propertize "hg log for " 'face font-lock-comment-face)
-                  (propertize default-directory 'face font-lock-constant-face)
+                  (propertize "hg log for " 'face ahg-header-line-face)
+                  (propertize default-directory 'face ahg-header-line-root-face)
                   "\n\n" (propertize (make-string width ?-) 'face 'bold) "\n"
                   (propertize "    Rev |    Date    |  Author  | Summary\n"
                               'face 'bold)
@@ -728,21 +775,21 @@ don't ask for revisions."
 
 
 (defvar ahg-log-font-lock-keywords
-  '(("^hg \\<[a-z]+\\> for" . font-lock-comment-face)
-    ("^hg \\<[a-z]+\\> for \\(.*\\)" 1 font-lock-constant-face)
-    ("^changeset:" . font-lock-function-name-face)
-    ("^tag:" . font-lock-function-name-face)
-    ("^user:" . font-lock-function-name-face)
-    ("^date:" . font-lock-function-name-face)
-    ("^summary:" . font-lock-function-name-face)
-    ("^files:" . font-lock-function-name-face)
-    ("^branch:" . font-lock-function-name-face)
-    ("^parent:" . font-lock-function-name-face)
-    ("^description:" . font-lock-function-name-face)
-    ("^\\(changeset\\|parent\\): +\\(.+\\)$" 2 font-lock-variable-name-face)
-    ("^\\(tag\\|branch\\): +\\(.+\\)$" 2 font-lock-keyword-face)
-    ("^user: +\\(.+\\)$" 1 font-lock-type-face)
-    ("^date: +\\(.+\\)$" 1 font-lock-string-face)
+  '(("^hg \\<[a-z]+\\> for" . ahg-header-line-face)
+    ("^hg \\<[a-z]+\\> for \\(.*\\)" 1 ahg-header-line-root-face)
+    ("^changeset:" . ahg-log-field-face)
+    ("^tag:" . ahg-log-field-face)
+    ("^user:" . ahg-log-field-face)
+    ("^date:" . ahg-log-field-face)
+    ("^summary:" . ahg-log-field-face)
+    ("^files:" . ahg-log-field-face)
+    ("^branch:" . ahg-log-field-face)
+    ("^parent:" . ahg-log-field-face)
+    ("^description:" . ahg-log-field-face)
+    ("^\\(changeset\\|parent\\): +\\(.+\\)$" 2 ahg-short-log-revision-face)
+    ("^\\(tag\\|branch\\): +\\(.+\\)$" 2 ahg-log-branch-face)
+    ("^user: +\\(.+\\)$" 1 ahg-short-log-user-face)
+    ("^date: +\\(.+\\)$" 1 ahg-short-log-date-face)
     )
   "Keywords in `ahg-log-mode' mode.")
 
@@ -841,15 +888,20 @@ argument, don't ask for revisions."
       (let ((inhibit-read-only t))
         (erase-buffer)
         (ahg-push-window-configuration)))
-    (ahg-generic-command "log" command-list
-                         (lambda (process status)
-                            (if (string= status "finished\n")
-                                (with-current-buffer (process-buffer process)
-                                  (ahg-log-mode)
-                                  (beginning-of-buffer)
-                                  (pop-to-buffer (current-buffer)))
-                              (ahg-show-error process)))
-                         buffer)))
+    (ahg-generic-command
+     "log" command-list
+     (lambda (process status)
+       (if (string= status "finished\n")
+           (with-current-buffer (process-buffer process)
+             (ahg-log-mode)
+             (beginning-of-buffer)
+             (let ((inhibit-read-only t))
+               (insert
+                (propertize "hg log for " 'face ahg-header-line-face)
+                (propertize default-directory 'face ahg-header-line-root-face)))
+             (pop-to-buffer (current-buffer)))
+         (ahg-show-error process)))
+     buffer)))
 
 ;;-----------------------------------------------------------------------------
 ;; hg diff
@@ -965,8 +1017,8 @@ Commands:
                    (concat "output of '"
                            (mapconcat 'identity (process-command process) " ")
                            "' on ")
-                   'face font-lock-comment-face)
-                  (propertize default-directory 'face font-lock-constant-face)
+                   'face ahg-header-line-face)
+                  (propertize default-directory 'face ahg-header-line-root-face)
                   "\n" (make-string (1- (window-width (selected-window))) ?-)
                   "\n\n"))))
          (ahg-show-error process)))
@@ -976,10 +1028,6 @@ Commands:
 ;; Various helper functions
 ;;-----------------------------------------------------------------------------
 
-;; (defun ahg-buffer-quit ()
-;;   (interactive)
-;;   (kill-buffer (current-buffer))
-;;   (or (one-window-p) (delete-window)))
 (defun ahg-buffer-quit ()
   (interactive)
   (let ((buf (current-buffer)))
@@ -1028,7 +1076,8 @@ Commands:
   (put 'ahg-window-configuration 'permanent-local t))
 
 (defun ahg-pop-window-configuration ()
-  (when (boundp 'ahg-window-configuration)
+  (when (and ahg-restore-window-configuration-on-quit
+             (boundp 'ahg-window-configuration))
     (set-window-configuration ahg-window-configuration)))
 
 ;; This is a cut&paste from dvc-capturing-lambda from the DVC package, and the
