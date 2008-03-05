@@ -21,6 +21,30 @@
 
 ;;; Commentary:
 
+(require 'diff-mode)
+(require 'easymenu)
+(require 'log-edit)
+
+;;-----------------------------------------------------------------------------
+;; the global aHg menu and keymap
+;;-----------------------------------------------------------------------------
+
+(easy-menu-add-item nil '("tools")
+                    '("aHg"
+                      ["Status" ahg-status t]
+                      ["Log Summary" ahg-short-log t]
+                      ["Detailed Log" ahg-log t]
+                      ["Hg Command" ahg-do-command t])
+                    "PCL-CVS")
+
+(defvar ahg-global-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "s" 'ahg-status)
+    (define-key map "l" 'ahg-short-log)
+    (define-key map "L" 'ahg-log)
+    (define-key map "!" 'ahg-do-command)
+    map))
+(global-set-key [(control c) ?h ?g] ahg-global-map)
 
 ;;-----------------------------------------------------------------------------
 ;; hg root
@@ -83,10 +107,8 @@ the current dir is not under hg."
   (font-lock-mode nil)
   (define-key ahg-status-mode-map "C-h" 'describe-mode)
   (define-key ahg-status-mode-map " " 'ahg-status-toggle-mark)
-  (define-key ahg-status-mode-map "m" (lambda () (interactive)
-                                        (ahg-status-mark t)))
-  (define-key ahg-status-mode-map "u" (lambda () (interactive)
-                                        (ahg-status-mark nil)))
+  (define-key ahg-status-mode-map "m" 'ahg-status-mark)
+  (define-key ahg-status-mode-map "u" 'ahg-status-unmark)
   (define-key ahg-status-mode-map "c" 'ahg-status-commit)
   (define-key ahg-status-mode-map "a" 'ahg-status-add)
   (define-key ahg-status-mode-map "=" 'ahg-status-diff)
@@ -97,19 +119,57 @@ the current dir is not under hg."
   (define-key ahg-status-mode-map "U" 'ahg-status-undo)
   (define-key ahg-status-mode-map "!" 'ahg-status-do-command)
   (define-key ahg-status-mode-map "l" 'ahg-short-log)
+  (define-key ahg-status-mode-map "L" 'ahg-log)
   (define-key ahg-status-mode-map "f" 'ahg-status-visit-file)
   (define-key ahg-status-mode-map "\r" 'ahg-status-visit-file)
   (define-key ahg-status-mode-map "o" 'ahg-status-visit-file-other-window)
   (let ((showmap (make-sparse-keymap)))
-    (define-key showmap "A" (lambda () (interactive) (ahg-status "-A")))
-    (define-key showmap "m" (lambda () (interactive) (ahg-status "-m")))
-    (define-key showmap "a" (lambda () (interactive) (ahg-status "-a")))
-    (define-key showmap "r" (lambda () (interactive) (ahg-status "-r")))
-    (define-key showmap "d" (lambda () (interactive) (ahg-status "-d")))
-    (define-key showmap "c" (lambda () (interactive) (ahg-status "-c")))
-    (define-key showmap "u" (lambda () (interactive) (ahg-status "-u")))
-    (define-key showmap "i" (lambda () (interactive) (ahg-status "-I")))
+    (define-key showmap "A" 'ahg-status-show-all)
+    (define-key showmap "m" 'ahg-status-show-modified)
+    (define-key showmap "a" 'ahg-status-show-added)
+    (define-key showmap "r" 'ahg-status-show-removed)
+    (define-key showmap "d" 'ahg-status-show-deleted)
+    (define-key showmap "c" 'ahg-status-show-clean)
+    (define-key showmap "u" 'ahg-status-show-unknown)
+    (define-key showmap "i" 'ahg-status-show-ignored)
     (define-key ahg-status-mode-map "s" showmap)))
+
+(easy-menu-define ahg-status-mode-menu ahg-status-mode-map "aHg Status"
+  '("aHg Status"
+    ["Visit File" ahg-status-visit-file [:keys "f" :active t]]
+    ["Visit File (Other Window)" ahg-status-visit-file-other-window
+     [:keys "o" :active t]]
+    ["--" nil nil]
+    ["Commit" ahg-status-commit [:keys "c" :active t]]
+    ["Add" ahg-status-add [:keys "a" :active t]]
+    ["Remove" ahg-status-remove [:keys "r" :active t]]
+    ["Undo" ahg-status-undo [:keys "U" :active t]]
+    ["Hg Command" ahg-status-do-command [:keys "!" :active t]]
+    ["--" nil nil]
+    ["Toggle Mark" ahg-status-toggle-mark [:keys " " :active t]]
+    ["Mark" ahg-status-mark [:keys "m" :active t]]
+    ["Unmark" ahg-status-unmark [:keys "u" :active t]]
+    ["--" nil nil]
+    ["Short Log" ahg-short-log [:keys "l" :active t]]
+    ["Detailed Log" ahg-log [:keys "L" :active t]]
+    ["Diff" ahg-status-diff [:keys "=" :active t]]
+    ["Diff All" ahg-status-diff-all [:keys "D" :active t]]
+    ["--" nil nil]
+    ("Show"
+     ["All" ahg-status-show-all [:keys "sA" :active t]]
+     ["Modified" ahg-status-show-modified [:keys "sm" :active t]]
+     ["Added" ahg-status-show-added [:keys "sa" :active t]]
+     ["Removed" ahg-status-show-removed [:keys "sr" :active t]]
+     ["Deleted" ahg-status-show-deleted [:keys "sd" :active t]]
+     ["Clean" ahg-status-show-clean [:keys "sc" :active t]]
+     ["Unknown" ahg-status-show-unknown [:keys "su" :active t]]
+     ["Ignored" ahg-status-show-ignored [:keys "si" :active t]]
+     )
+    ["--" nil nil]
+    ["Refresh" ahg-status-refresh [:keys "g" :active t]]
+    ["Quit" ahg-buffer-quit [:keys "q" :active t]]
+    ))
+(easy-menu-add ahg-status-mode-menu ahg-status-mode-map)
 
 
 (defun ahg-status (&rest extra-switches)
@@ -152,7 +212,7 @@ to pass extra switches to hg status."
       (setq node (ewoc-next ewoc node))
       (when node (goto-char (ewoc-location node))))))
 
-(defun ahg-status-mark (yes)
+(defun ahg-status-do-mark (yes)
   (let* ((node (ewoc-locate ewoc))
          (data (and node (ewoc-data node)))
          (inhibit-read-only t))
@@ -163,6 +223,17 @@ to pass extra switches to hg status."
       (setq node (ewoc-next ewoc node))
       (when node (goto-char (ewoc-location node))))))
 
+(defun ahg-status-mark () (interactive) (ahg-status-do-mark t))
+(defun ahg-status-unmark () (interactive) (ahg-status-do-mark nil))
+
+(defun ahg-status-show-all () (interactive) (ahg-status "-A"))
+(defun ahg-status-show-modified () (interactive) (ahg-status "-m"))
+(defun ahg-status-show-added () (interactive) (ahg-status "-a"))
+(defun ahg-status-show-removed () (interactive) (ahg-status "-r"))
+(defun ahg-status-show-deleted () (interactive) (ahg-status "-d"))
+(defun ahg-status-show-clean () (interactive) (ahg-status "-c"))
+(defun ahg-status-show-unknown () (interactive) (ahg-status "-u"))
+(defun ahg-status-show-ignored () (interactive) (ahg-status "-i"))
 
 (defun ahg-status-get-marked (action-if-empty &optional filter)
   "Returns the list of marked nodes. If such list is empty, behave according to
@@ -427,6 +498,23 @@ Commands:
   (set (make-local-variable 'font-lock-defaults)
        (list 'ahg-short-log-font-lock-keywords t nil nil)))
 
+(easy-menu-define ahg-short-log-mode-menu ahg-short-log-mode-map "aHg Short Log"
+  '("aHg Short Log"
+    ["View Revision Diff" ahg-short-log-view-diff [:keys "=" :active t]]
+    ["View Revision Details" ahg-short-log-view-details [:keys " " :active t]]
+    ["--" nil nil]
+    ["Status" ahg-status [:keys "s" :active t]]
+    ["Hg Command" ahg-do-command [:keys "!" :active t]]
+    ["--" nil nil]
+    ["Next Revision" ahg-short-log-next [:keys "n" :active t]]
+    ["Previous Revision" ahg-short-log-previous [:keys "p" :active t]]
+    ["Go To Revision..." ahg-short-log-goto-revision [:keys "r" :active t]]
+    ["--" nil nil]
+    ["Refresh" ahg-short-log [:keys "g" :active t]]
+    ["Quit" ahg-buffer-quit [:keys "q" :active t]]
+    ))
+(easy-menu-add ahg-short-log-mode-menu ahg-short-log-mode-map)
+
 
 (defun ahg-short-log-format (output &optional width)
   "Formats the output returned by hg log for displaying it in a short-log
@@ -641,6 +729,22 @@ Commands:
   (define-key ahg-log-mode-map [?!] 'ahg-do-command)
   (set (make-local-variable 'font-lock-defaults)
        (list 'ahg-log-font-lock-keywords t nil nil)))
+
+(easy-menu-define ahg-log-mode-menu ahg-log-mode-map "aHg Log"
+  '("aHg Log"
+    ["View Revision Diff" ahg-log-view-diff [:keys "=" :active t]]
+    ["--" nil nil]
+    ["Status" ahg-status [:keys "s" :active t]]
+    ["Hg Command" ahg-do-command [:keys "!" :active t]]
+    ["--" nil nil]
+    ["Next Revision" ahg-log-next [:keys "\t" :active t]]
+    ["Previous Revision" ahg-log-previous [:keys "p" :active t]]
+    ["--" nil nil]
+    ["Refresh" ahg-log [:keys "g" :active t]]
+    ["Quit" ahg-buffer-quit [:keys "q" :active t]]
+    ))
+(easy-menu-add ahg-log-mode-menu ahg-log-mode-map)
+
 
 (defconst ahg-log-start-regexp "^changeset: +\\([0-9]+:[0-9a-f]+\\)")
 (defun ahg-log-next (n)
