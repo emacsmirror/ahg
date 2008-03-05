@@ -102,7 +102,11 @@ the current dir is not under hg."
 
 
 (define-derived-mode ahg-status-mode nil "aHg-status"
-  "Major mode for *hg status* buffers."
+  "Major mode for *hg status* buffers.
+
+Commands:
+\\{ahg-status-mode-map}
+"
   (toggle-read-only t)
   (font-lock-mode nil)
   (define-key ahg-status-mode-map "C-h" 'describe-mode)
@@ -710,6 +714,9 @@ don't ask for revisions."
 
 (define-derived-mode ahg-log-mode nil "ahg-log"
   "Major mode to display hg log output.
+
+Commands:
+\\{ahg-log-mode-map}
 "
   (toggle-read-only t)
   (define-key ahg-log-mode-map (kbd "C-h") 'describe-mode)
@@ -943,7 +950,11 @@ destination buffer. If nil, a new buffer will be used."
              (mapconcat 'identity (process-command process) " "))))
 
 (define-derived-mode ahg-command-mode nil "aHg command"
-  "Major mode for aHg commands"
+  "Major mode for aHg commands.
+
+Commands:
+\\{ahg-command-mode-map}
+"
   (toggle-read-only t)
   (font-lock-mode nil)
   (define-key ahg-command-mode-map "q" 'ahg-buffer-quit))
