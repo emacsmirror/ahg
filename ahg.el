@@ -704,7 +704,7 @@ Commands:
         (r2 "tip"))
     (when (string-to-number r1)
       (setq r2 (number-to-string (1- (string-to-number r1)))))
-    (ahg-diff r1 r2)))
+    (ahg-diff r2 r1)))
 
 (defun ahg-short-log-view-details (&optional rev)
   "View details of the given revision."
@@ -897,7 +897,7 @@ Commands:
         (r2 "tip"))
     (when (string-to-number r1)
       (setq r2 (number-to-string (1- (string-to-number r1)))))
-    (ahg-diff r1 r2)))
+    (ahg-diff r2 r1)))
 
 (defun ahg-log-revision-at-point (&optional short-id)
   (save-excursion
