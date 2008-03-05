@@ -205,7 +205,6 @@ the current dir is not under hg."
   (gethash status-code ahg-face-status-hash 'default))
 
 
-
 (define-derived-mode ahg-status-mode nil "aHg-status"
   "Major mode for *hg status* buffers.
 
@@ -214,10 +213,11 @@ Commands:
 "
   (toggle-read-only t)
   (font-lock-mode nil)
-  (define-key ahg-status-mode-map "C-h" 'describe-mode)
+  (define-key ahg-status-mode-map (kbd "C-h") 'describe-mode)
   (define-key ahg-status-mode-map " " 'ahg-status-toggle-mark)
   (define-key ahg-status-mode-map "m" 'ahg-status-mark)
   (define-key ahg-status-mode-map "u" 'ahg-status-unmark)
+  (define-key ahg-status-mode-map (kbd "M-DEL") 'ahg-status-unmark-all)
   (define-key ahg-status-mode-map "c" 'ahg-status-commit)
   (define-key ahg-status-mode-map "a" 'ahg-status-add)
   (define-key ahg-status-mode-map "=" 'ahg-status-diff)
@@ -259,6 +259,7 @@ Commands:
     ["Toggle Mark" ahg-status-toggle-mark [:keys " " :active t]]
     ["Mark" ahg-status-mark [:keys "m" :active t]]
     ["Unmark" ahg-status-unmark [:keys "u" :active t]]
+    ["Unmark All" ahg-status-unmark-all [:keys (kbd "M-DEL") :active t]]
     ["--" nil nil]
     ["Short Log" ahg-short-log [:keys "l" :active t]]
     ["Detailed Log" ahg-log [:keys "L" :active t]]
@@ -335,6 +336,10 @@ to pass extra switches to hg status."
 
 (defun ahg-status-mark () (interactive) (ahg-status-do-mark t))
 (defun ahg-status-unmark () (interactive) (ahg-status-do-mark nil))
+
+(defun ahg-status-unmark-all ()
+  (interactive)
+  (ewoc-map (lambda (d) (when (car d) (setcar d nil) t)) ewoc))
 
 (defun ahg-status-show-all () (interactive) (ahg-status "-A"))
 (defun ahg-status-show-modified () (interactive) (ahg-status "-m"))
