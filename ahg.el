@@ -20,11 +20,57 @@
 ;; Boston, MA 02110-1301, USA.
 
 ;;; Commentary:
+;;; A simple Emacs interface for the Mercurial (Hg) Distributed SCM.
+;;; Installation: put this file where Emacs can find it, and then add the line
+;;; (require 'ahg)
+;;; to your .emacs
 
 (require 'diff-mode)
 (require 'easymenu)
 (require 'log-edit)
 (require 'cl)
+
+;;-----------------------------------------------------------------------------
+;; Customization
+;;-----------------------------------------------------------------------------
+
+(defgroup ahg nil "aHg Mercurial Frontend" :group 'tools)
+
+(defcustom ahg-global-key-prefix "hg"
+  "Prefix of globally-available aHg commands."
+  :group 'ahg :type 'string)
+
+(defface ahg-status-marked-face
+  '((t '(:inherit font-lock-preprocessor-face)))
+  "Face for marked files in aHg status buffers.")
+
+(defface ahg-status-modified-face
+  '((t '(:inherit font-lock-function-name-face)))
+  "Face for modified files in aHg status buffers.")
+
+(defface ahg-status-added-face
+  '((t '(:inherit font-lock-type-face)))
+  "Face for added files in aHg status buffers.")
+
+(defface ahg-status-removed-face
+  '((t '(:inherit font-lock-constant-face)))
+  "Face for removed files in aHg status buffers.")
+
+(defface ahg-status-clean-face
+  '((t '(:inherit 'default)))
+  "Face for clean files in aHg status buffers.")
+
+(defface ahg-status-deleted-face
+  '((t '(:inherit font-lock-string-face)))
+  "Face for deleted files in aHg status buffers.")
+
+(defface ahg-status-ignored-face
+  '((t '(:inherit font-lock-comment-face)))
+  "Face for ignored files in aHg status buffers.")
+
+(defface ahg-status-unknown-face
+  '((t '(:inherit font-lock-variable-name-face)))
+  "Face for unknown files in aHg status buffers.")
 
 ;;-----------------------------------------------------------------------------
 ;; the global aHg menu and keymap
@@ -45,7 +91,7 @@
     (define-key map "L" 'ahg-log)
     (define-key map "!" 'ahg-do-command)
     map))
-(global-set-key [(control c) ?h ?g] ahg-global-map)
+(global-set-key ahg-global-key-prefix ahg-global-map)
 
 ;;-----------------------------------------------------------------------------
 ;; hg root
@@ -54,8 +100,9 @@
 (defun ahg-root ()
   "Returns the root of the tree handled by Mercurial, or nil if
 the current dir is not under hg."
-  (let ((r (shell-command-to-string "hg root")))
-    (if (string= (substring r 0 7) "abort: ") nil (substring r 0 -1))))
+  (with-temp-buffer
+    (when (= (call-process "hg" nil t nil "root") 0)
+      (buffer-substring-no-properties (point-min) (1- (point-max))))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg identify
@@ -63,23 +110,27 @@ the current dir is not under hg."
 
 (defun ahg-identify (&optional root)
   (interactive)
-  (unless root (setq root (ahg-root)))
-  (let* ((default-directory (file-name-as-directory root))
-         (r (shell-command-to-string (concat "hg identify"))))
-    (if (string= (substring r 0 7) "abort: ") nil (substring r 0 -1))))
+  (with-temp-buffer
+    (let ((status
+           (if root
+               (let ((default-directory (file-name-as-directory root)))
+                 (call-process "hg" nil t nil "identify"))
+             (call-process "hg" nil t nil "identify"))))
+      (when (= status 0)
+        (buffer-substring-no-properties (point-min) (1- (point-max)))))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg status
 ;;-----------------------------------------------------------------------------
 
-(defvar ahg-status-marked-face font-lock-preprocessor-face)
-(defvar ahg-status-modified-face font-lock-function-name-face)
-(defvar ahg-status-added-face font-lock-type-face)
-(defvar ahg-status-removed-face font-lock-constant-face)
-(defvar ahg-status-clean-face 'default)
-(defvar ahg-status-deleted-face font-lock-string-face)
-(defvar ahg-status-ignored-face font-lock-comment-face)
-(defvar ahg-status-unknown-face font-lock-variable-name-face)
+;;(defvar ahg-status-marked-face font-lock-preprocessor-face)
+;; (defvar ahg-status-modified-face font-lock-function-name-face)
+;; (defvar ahg-status-added-face font-lock-type-face)
+;; (defvar ahg-status-removed-face font-lock-constant-face)
+;; (defvar ahg-status-clean-face 'default)
+;; (defvar ahg-status-deleted-face font-lock-string-face)
+;; (defvar ahg-status-ignored-face font-lock-comment-face)
+;; (defvar ahg-status-unknown-face font-lock-variable-name-face)
 
 (defvar ahg-face-status-hash
   (let* ((test (define-hash-table-test 'ahg-str-hash 'string= 'sxhash))
@@ -868,7 +919,7 @@ Commands:
 
 (defun ahg-complete-command (command)
   ;; we split the string, and treat the last word as a filename
-  (let* ((idx (string-match "\\([^ \\t]+\\)$" command))
+  (let* ((idx (string-match "\\([^ ]+\\)$" command))
          (matches
           (if (= idx 0) (ahg-match-command command)
             (file-expand-wildcards (concat (substring command idx) "*"))))
@@ -904,11 +955,11 @@ Commands:
      (lambda (process status)
        (if (string= status "finished\n")
            (with-current-buffer (process-buffer process)
-             (beginning-of-buffer)
              (ahg-command-mode)
              (pop-to-buffer (current-buffer))
              (when ahg-do-command-insert-header
                (let ((inhibit-read-only t))
+                 (beginning-of-buffer)
                  (insert
                   (propertize
                    (concat "output of '"
