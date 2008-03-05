@@ -996,26 +996,27 @@ Commands:
 
 (defun ahg-complete-command-name (command)
   (with-temp-buffer
-    (if (= (call-process "hg" nil t nil "help") 0)
-        (let (out)
-          (beginning-of-buffer)
-          (search-forward "list of commands:")
-          (beginning-of-line)
-          (forward-line 2)
-          (while (not (or (looking-at "^$") (eobp)))
-            (forward-char 1)
-            (let* ((pt (point))
-                   (cmd (buffer-substring-no-properties
-                         pt (progn (forward-word) (point))))
-                   (ok (compare-strings command 0 nil cmd 0 nil)))
-              (when (or (eq ok t) (= (- ok) (1+ (length command))))
-                (setq out (cons cmd out)))
+    (let ((process-environment (cons "LANG=" process-environment))) 
+      (if (= (call-process "hg" nil t nil "help") 0)
+          (let (out)
+            (beginning-of-buffer)
+            (search-forward "list of commands:")
             (beginning-of-line)
-            (forward-line 1)))
-          (if out (nreverse out) (list command)))
-      ;; here, we silently ignore errors, and return the command itself as a
-      ;; match
-      (list command))))
+            (forward-line 2)
+            (while (not (or (looking-at "^$") (eobp)))
+              (forward-char 1)
+              (let* ((pt (point))
+                     (cmd (buffer-substring-no-properties
+                           pt (progn (forward-word) (point))))
+                     (ok (compare-strings command 0 nil cmd 0 nil)))
+                (when (or (eq ok t) (= (- ok) (1+ (length command))))
+                  (setq out (cons cmd out)))
+                (beginning-of-line)
+                (forward-line 1)))
+            (if out (nreverse out) (list command)))
+        ;; here, we silently ignore errors, and return the command itself as a
+        ;; match
+        (list command)))))
 
 (defun ahg-complete-command (command)
   ;; we split the string, and treat the last word as a filename
