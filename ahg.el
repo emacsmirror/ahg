@@ -31,6 +31,28 @@
 (require 'cl)
 
 ;;-----------------------------------------------------------------------------
+;; the global aHg menu and keymap
+;;-----------------------------------------------------------------------------
+
+(easy-menu-add-item nil '("tools")
+                    '("aHg"
+                      ["Status" ahg-status t]
+                      ["Log Summary" ahg-short-log t]
+                      ["Detailed Log" ahg-log t]
+                      ["Execute Hg Command" ahg-do-command t]
+                      ["Help on Hg Command" ahg-command-help t])
+                    "PCL-CVS")
+
+(defvar ahg-global-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "s" 'ahg-status)
+    (define-key map "l" 'ahg-short-log)
+    (define-key map "L" 'ahg-log)
+    (define-key map "!" 'ahg-do-command)
+    (define-key map "h" 'ahg-command-help)
+    map))
+
+;;-----------------------------------------------------------------------------
 ;; Customization
 ;;-----------------------------------------------------------------------------
 
@@ -38,7 +60,10 @@
 
 (defcustom ahg-global-key-prefix "hg"
   "Prefix of globally-available aHg commands."
-  :group 'ahg :type 'string)
+  :group 'ahg :type 'string
+  :set (function (lambda (symbol value)
+                   (when (boundp symbol) (global-unset-key (eval symbol)))
+                   (global-set-key (set symbol value) ahg-global-map))))
 
 (defcustom ahg-do-command-insert-header t
   "If non-nil, `ahg-do-command' will insert a header line in the
@@ -136,29 +161,6 @@ command output." :group 'ahg :type 'boolean)
 (defvar ahg-short-log-user-face 'ahg-short-log-user-face)
 (defvar ahg-header-line-face 'ahg-header-line-face)
 (defvar ahg-header-line-root-face 'ahg-header-line-root-face)
-
-;;-----------------------------------------------------------------------------
-;; the global aHg menu and keymap
-;;-----------------------------------------------------------------------------
-
-(easy-menu-add-item nil '("tools")
-                    '("aHg"
-                      ["Status" ahg-status t]
-                      ["Log Summary" ahg-short-log t]
-                      ["Detailed Log" ahg-log t]
-                      ["Execute Hg Command" ahg-do-command t]
-                      ["Help on Hg Command" ahg-command-help t])
-                    "PCL-CVS")
-
-(defvar ahg-global-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map "s" 'ahg-status)
-    (define-key map "l" 'ahg-short-log)
-    (define-key map "L" 'ahg-log)
-    (define-key map "!" 'ahg-do-command)
-    (define-key map "h" 'ahg-command-help)
-    map))
-(global-set-key ahg-global-key-prefix ahg-global-map)
 
 ;;-----------------------------------------------------------------------------
 ;; hg root
