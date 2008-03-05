@@ -236,6 +236,7 @@ the singleton list with the node at point."
   (define-key ahg-status-mode-map "q" 'ahg-buffer-quit)
   (define-key ahg-status-mode-map "U" 'ahg-status-undo)
   (define-key ahg-status-mode-map "!" 'ahg-command)
+  (define-key ahg-status-mode-map "l" 'ahg-short-log)
   (let ((showmap (make-sparse-keymap)))
     (define-key showmap "A" (lambda () (interactive) (ahg-status "-A")))
     (define-key showmap "m" (lambda () (interactive) (ahg-status "-m")))
@@ -320,7 +321,7 @@ to pass extra switches to hg status."
 (defun ahg-commit-callback ()
   (interactive)
   (let ((msg (buffer-string)))
-    (let ((args (append (list "-m" (shell-quote-argument msg))
+    (let ((args (append (list "-m" msg)
                         (log-edit-files))))
       (ahg-generic-command "commit" args
                            (ahg-capturing-lambda (process status)
