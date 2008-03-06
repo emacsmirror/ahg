@@ -581,13 +581,12 @@ ahg-status, and it has an ewoc associated with it."
 
 (defun ahg-commit (files)
   "Run hg commit. Pops up a buffer for editing the log file."
-  (interactive (list (buffer-file-name)))
   (let ((buf (generate-new-buffer "*aHg-log*")))
     (log-edit
      'ahg-commit-callback
      nil
      (list (cons 'log-edit-listfun
-                 (lexical-let ((flist files)) (lambda () (message "flist is: %s" flist) flist))))
+                 (lexical-let ((flist files)) (lambda () flist))))
      buf)))
 
 (defun ahg-commit-cur-file ()
