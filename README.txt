@@ -1,6 +1,6 @@
-======================================================
- aHg: Alberto's Emacs front-end for the Mercurial SCM
-======================================================
+===============================================
+ aHg: An Emacs front-end for the Mercurial SCM
+===============================================
 
 :Author: Alberto Griggio
 :Contact: agriggio@users.sourceforge.net
