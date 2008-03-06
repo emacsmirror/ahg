@@ -571,11 +571,14 @@ ahg-status, and it has an ewoc associated with it."
                         (log-edit-files))))
       (ahg-generic-command
        "commit" args
-       (lexical-let ((aroot (ahg-root)))
+       (lexical-let ((aroot (ahg-root))
+                     (n (length (log-edit-files))))
          (lambda (process status)
            (if (string= status "finished\n")
                (let ((buf (ahg-get-status-buffer aroot)))
-                 (when buf (ahg-status)))
+                 (when buf (ahg-status))
+                 (message "Succesfully committed %d file%s." n
+                          (if (> n 1) "s" "")))
              (ahg-show-error process)))))))
   (kill-buffer (current-buffer)))
 
