@@ -587,7 +587,7 @@ ahg-status, and it has an ewoc associated with it."
      'ahg-commit-callback
      nil
      (list (cons 'log-edit-listfun
-                 (lexical-let ((flist files)) (lambda () flist))))
+                 (lexical-let ((flist files)) (lambda () (message "flist is: %s" flist) flist))))
      buf)))
 
 (defun ahg-commit-cur-file ()
@@ -1177,10 +1177,12 @@ Commands:
   (font-lock-mode nil)
   (define-key ahg-command-mode-map "h" 'ahg-command-help)
   (define-key ahg-command-mode-map "q" 'ahg-buffer-quit)
+  (define-key ahg-command-mode-map "!" 'ahg-do-command)
   (easy-menu-add ahg-command-mode-menu ahg-command-mode-map))
 
 (easy-menu-define ahg-command-mode-menu ahg-command-mode-map "aHg Command"
   '("aHg Command"
+    ["Execute Hg Command" ahg-do-command [:keys "!" :active t]]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]))
 
