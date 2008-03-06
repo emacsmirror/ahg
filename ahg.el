@@ -706,19 +706,19 @@ Commands:
       (setq r2 (number-to-string (1- (string-to-number r1)))))
     (ahg-diff r2 r1)))
 
-(defun ahg-short-log-view-details (&optional rev)
+(defun ahg-short-log-view-details ()
   "View details of the given revision."
   (interactive)
-  (when (interactive-p)
-    (setq rev (ahg-short-log-revision-at-point)))
-  (ahg-log rev nil))
+  (let ((rev (ahg-short-log-revision-at-point)))
+    (ahg-log rev nil)))
 
 
 (defun ahg-short-log-view-details-mouse (event)
   (interactive "e")
-  (save-excursion
+  (save-window-excursion
+    (select-window (posn-window (event-end event)) t)
     (goto-char (posn-point (event-end event)))
-    (ahg-short-log-view-details (ahg-short-log-revision-at-point))))
+    (ahg-short-log-view-details)))
 
 
 (defun ahg-short-log-view-diff-mouse (event)
