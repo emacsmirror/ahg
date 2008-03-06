@@ -577,7 +577,7 @@ ahg-status, and it has an ewoc associated with it."
            (if (string= status "finished\n")
                (let ((buf (ahg-get-status-buffer aroot)))
                  (when buf (ahg-status))
-                 (message "Succesfully committed %d file%s." n
+                 (message "Successfully committed %d file%s." n
                           (if (> n 1) "s" "")))
              (ahg-show-error process)))))))
   (kill-buffer (current-buffer)))
