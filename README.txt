@@ -9,15 +9,18 @@
 DESCRIPTION
 -----------
 
-aHg is a simple Emacs front-end for the Mercurial (Hg) Distributed Source
+aHg is a simple Emacs_ front-end for the Mercurial_ (Hg) Distributed Source
 Control Management (SCM) system. 
 
-Its aims are simplicity and ease of use. It was inspired by DVC
-(http://www.xsteve.at/prg/emacs_dvc/dvc.html), but it focuses exclusively on
-Mercurial instead of supporting multiple Distributed SCMs. 
+Its aims are simplicity and ease of use. It was inspired by DVC_, but it
+focuses exclusively on Mercurial instead of supporting multiple Distributed
+SCMs.
 
 For a list of features, see the `QUICK GUIDE`_ section below.
 
+.. _Emacs: http://www.gnu.org/software/emacs/
+.. _Mercurial: http://selenic.com/mercurial/
+.. _DVC: http://www.xsteve.at/prg/emacs_dvc/dvc.html
 
 DOWNLOAD
 --------
@@ -86,6 +89,6 @@ commands.
 LICENSE
 -------
 
-The program is released under the `GNU GPL v3`__ License.
+The program is released under the `GNU GPL`__ License.
 
 __ http://www.gnu.org/copyleft/gpl.html
