@@ -6,7 +6,7 @@
 :Contact: agriggio@users.sourceforge.net
 
 
-DESCRIPTION
+Description
 -----------
 
 aHg is a simple Emacs_ front-end for the Mercurial_ (Hg) Distributed Source
@@ -16,19 +16,20 @@ Its aims are simplicity and ease of use. It was inspired by DVC_, but it
 focuses exclusively on Mercurial instead of supporting multiple Distributed
 SCMs.
 
-For a list of features, see the `QUICK GUIDE`_ section below.
+For a list of features, see the `Quick Guide`_ section below.
 
 .. _Emacs: http://www.gnu.org/software/emacs/
 .. _Mercurial: http://selenic.com/mercurial/
 .. _DVC: http://www.xsteve.at/prg/emacs_dvc/dvc.html
 
-DOWNLOAD
+
+Download
 --------
 
 An hg repository can be found at http://wxglade.sf.net/hg/ahg
 
 
-INSTALLATION
+Installation
 ------------
 
 Put ``ahg.el`` in a directory where Emacs can find it (e.g. in
@@ -43,7 +44,7 @@ Then, simply add this to your ``.emacs``::
   (require 'ahg)
 
 
-QUICK GUIDE
+Quick Guide
 -----------
 
 After the installation, an ``aHg`` menu appears as a child of the standard
@@ -85,8 +86,14 @@ special buffers. Each of these has its own menu, with further available
 commands.
 
 
+Customization
+~~~~~~~~~~~~~
 
-LICENSE
+There are some options that you can customize (e.g. global keybindings or
+fonts). To do so, use ``M-x customize-group RET ahg``.
+
+
+License
 -------
 
 The program is released under the `GNU GPL`__ License.
