@@ -610,7 +610,7 @@ ahg-status, and it has an ewoc associated with it."
 (defvar ahg-short-log-line-map
   (let ((map (make-sparse-keymap)))
     (define-key map [mouse-1] 'ahg-short-log-view-details-mouse)
-    (define-key map [mouse-2] 'ahg-short-log-view-details-mouse)
+    (define-key map [mouse-2] 'ahg-short-log-view-diff-mouse)
     map))
 
 ;; (defvar ahg-short-log-revision-face font-lock-function-name-face)
@@ -719,6 +719,14 @@ Commands:
   (save-excursion
     (goto-char (posn-point (event-end event)))
     (ahg-short-log-view-details (ahg-short-log-revision-at-point))))
+
+
+(defun ahg-short-log-view-diff-mouse (event)
+  (interactive "e")
+  (save-window-excursion
+    (select-window (posn-window (event-end event)) t)
+    (goto-char (posn-point (event-end event)))
+    (ahg-short-log-view-diff)))
 
 
 (defun ahg-short-log-goto-revision (rev)
