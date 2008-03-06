@@ -39,6 +39,8 @@
                       ["Status" ahg-status t]
                       ["Log Summary" ahg-short-log t]
                       ["Detailed Log" ahg-log t]
+                      ["Commit Current File" ahg-commit-cur-file t]
+                      ["View Changes of Current File" ahg-diff-cur-file t]
                       ["Execute Hg Command" ahg-do-command t]
                       ["Help on Hg Command" ahg-command-help t])
                     "PCL-CVS")
@@ -50,6 +52,8 @@
     (define-key map "L" 'ahg-log)
     (define-key map "!" 'ahg-do-command)
     (define-key map "h" 'ahg-command-help)
+    (define-key map "c" 'ahg-commit-cur-file)
+    (define-key map "=" 'ahg-diff-cur-file)
     map))
 
 ;;-----------------------------------------------------------------------------
@@ -586,6 +590,14 @@ ahg-status, and it has an ewoc associated with it."
                  (lexical-let ((flist files)) (lambda () flist))))
      buf)))
 
+(defun ahg-commit-cur-file ()
+  "Run hg commit on the current file only."
+  (interactive)
+  (cond ((eq major-mode 'ahg-status-mode)
+         (call-interactively 'ahg-status-commit))
+        ((buffer-file-name) (ahg-commit (list (buffer-file-name))))
+        (t (message "hg commit: no file found, aborting."))))
+
 ;;-----------------------------------------------------------------------------
 ;; hg log
 ;;-----------------------------------------------------------------------------
@@ -983,7 +995,7 @@ Commands:
                                       [:keys "q" :active t]]))
 
 
-(defun ahg-diff (&optional r1 r2)
+(defun ahg-diff (&optional r1 r2 files)
   (interactive "P")
   (when (interactive-p)
     (unless r1
@@ -993,6 +1005,8 @@ Commands:
         (command-list (ahg-args-add-revs r1 r2 t)))
     (when ahg-diff-use-git-format
       (setq command-list (cons "--git" command-list)))
+    (when files
+      (setq command-list (append command-list files)))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
@@ -1006,6 +1020,15 @@ Commands:
                                  (beginning-of-buffer))
                              (ahg-show-error process)))
                          buffer)))
+
+(defun ahg-diff-cur-file ()
+  (interactive)
+  (cond ((eq major-mode 'ahg-status-mode) (call-interactively 'ahg-status-diff))
+        ((eq major-mode 'ahg-short-log-mode)
+         (call-interactively 'ahg-short-log-view-diff))
+        ((eq major-mode 'ahg-log-mode) (call-interactively 'ahg-log-view-diff))
+        ((buffer-file-name) (ahg-diff nil nil (list (buffer-file-name))))
+        (t (message "hg diff: no file found, aborting."))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg command
