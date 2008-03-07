@@ -304,13 +304,11 @@ Commands:
   "Run hg status. When called non-interactively, it is possible
 to pass extra switches to hg status."
   (interactive)
-  (let* ((buf (get-buffer-create "*aHg-status*"))
-         (process (apply 'start-process-shell-command
-                         "aHg-status" buf "hg status" extra-switches)))
-    (set-process-sentinel process 'ahg-status-sentinel)
+  (let ((buf (get-buffer-create "*aHg-status*")))
     (with-current-buffer buf
       (set (make-local-variable 'ahg-root) (ahg-root))
-      (ahg-push-window-configuration))))
+      (ahg-push-window-configuration))
+    (ahg-generic-command "status" extra-switches 'ahg-status-sentinel buf)))
 
 (defun ahg-status-pp (data)
   "Pretty-printer for data elements in a *hg status* buffer."
@@ -501,31 +499,31 @@ ahg-status, and it has an ewoc associated with it."
   (get-buffer (concat "*hg status: " root "*")))
 
 (defun ahg-status-sentinel (process status)
-  (if (string= status "finished\n")
-      ;; everything was ok, we can show the status buffer
-      (let* ((buf (process-buffer process))
-             (root (with-current-buffer buf ahg-root))
-             (ew (ahg-get-status-ewoc root))
-             (outbuf (ewoc-buffer ew))
-             (cfg (with-current-buffer buf ahg-window-configuration)))
-        (with-current-buffer buf
-          (beginning-of-buffer)
-          (while (not (eobp))
-            (ewoc-enter-last
-             ew
-             (cons nil
-                   (cons (buffer-substring (point) (1+ (point)))
-                         (buffer-substring (+ (point) 2) (point-at-eol)))))
-            (forward-line 1)))
-        (kill-buffer buf)
-        (pop-to-buffer outbuf)
-        (set (make-local-variable 'ahg-window-configuration) cfg)
-        (let ((inhibit-read-only t)
-              (node (ewoc-nth ew 0)))
-          (ewoc-refresh ew)
-          (when node (goto-char (ewoc-location node)))))
-    ;; error, we signal it and pop to the buffer
-    (ahg-show-error process)))
+  (with-temp-message (or (current-message) "")
+    (if (string= status "finished\n")
+        ;; everything was ok, we can show the status buffer
+        (let* ((buf (process-buffer process))
+               (root (with-current-buffer buf ahg-root))
+               (ew (ahg-get-status-ewoc root))
+               (outbuf (ewoc-buffer ew))
+               (cfg (with-current-buffer buf ahg-window-configuration)))
+          (with-current-buffer buf
+            (beginning-of-buffer)
+            (while (not (eobp))
+              (ewoc-enter-last
+               ew
+               (cons nil
+                     (cons (buffer-substring (point) (1+ (point)))
+                           (buffer-substring (+ (point) 2) (point-at-eol)))))
+              (forward-line 1)))
+          (kill-buffer buf)
+          (pop-to-buffer outbuf)
+          (set (make-local-variable 'ahg-window-configuration) cfg)
+          (let ((inhibit-read-only t)
+                (node (ewoc-nth ew 0)))
+            (when node (goto-char (ewoc-location node)))))
+      ;; error, we signal it and pop to the buffer
+      (ahg-show-error process))))
 
 
 (defun ahg-status-visit-file (&optional other-window)
@@ -580,8 +578,11 @@ ahg-status, and it has an ewoc associated with it."
            (if (string= status "finished\n")
                (let ((buf (ahg-get-status-buffer aroot)))
                  (when buf (ahg-status))
-                 (message "Successfully committed %d file%s." n
-                          (if (> n 1) "s" "")))
+                 (message "Successfully committed %s."
+                          (if (> n 0)
+                              (format "%d file%s." n (if (> n 1) "s" ""))
+                            "all modified files"))
+                 (kill-buffer (process-buffer process)))
              (ahg-show-error process)))))))
   (kill-buffer (current-buffer)))
 
