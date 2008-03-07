@@ -3,4 +3,5 @@ syntax: glob
 **~
 **.elc
 \#**
-README.html
+.\#**
+ahg.html
