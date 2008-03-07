@@ -580,7 +580,7 @@ ahg-status, and it has an ewoc associated with it."
                  (when buf (ahg-status))
                  (message "Successfully committed %s."
                           (if (> n 0)
-                              (format "%d file%s." n (if (> n 1) "s" ""))
+                              (format "%d file%s" n (if (> n 1) "s" ""))
                             "all modified files"))
                  (kill-buffer (process-buffer process)))
              (ahg-show-error process)))))))
