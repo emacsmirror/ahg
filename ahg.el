@@ -71,6 +71,11 @@
   "If non-nil, `ahg-do-command' will insert a header line in the
 command output." :group 'ahg :type 'boolean)
 
+(defcustom ahg-do-command-show-buffer-immediately t
+  "If non-nil, `ahg-do-command' will immediately switch to the buffer with the
+command output, instead of waiting for the command to finish."
+  :group 'ahg :type 'boolean)
+
 (defcustom ahg-restore-window-configuration-on-quit t
   "If non-nil, when `ahg-buffer-quit' will restore the window configuration."
   :group 'ahg :type 'boolean)
@@ -1091,27 +1096,29 @@ Commands:
       (setq args (append args ahg-do-command-extra-args)))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
+        (ahg-command-mode)
         (erase-buffer)
         (ahg-push-window-configuration)))
+    (when ahg-do-command-show-buffer-immediately
+      (pop-to-buffer buffer))
+    (when ahg-do-command-insert-header
+      (with-current-buffer buffer
+        (let ((inhibit-read-only t))
+          (beginning-of-buffer)
+          (insert
+           (propertize
+            (concat "output of 'hg " (mapconcat 'identity args " ") "' on ")
+            'face ahg-header-line-face)
+           (propertize default-directory 'face ahg-header-line-root-face)
+           "\n" (make-string (1- (window-width (selected-window))) ?-)
+           "\n\n"))))
     (ahg-generic-command
      cmdname (cdr args)
      (lambda (process status)
        (if (string= status "finished\n")
-           (with-current-buffer (process-buffer process)
-             (ahg-command-mode)
+           (progn
              (pop-to-buffer (current-buffer))
-             (when ahg-do-command-insert-header
-               (let ((inhibit-read-only t))
-                 (beginning-of-buffer)
-                 (insert
-                  (propertize
-                   (concat "output of '"
-                           (mapconcat 'identity (process-command process) " ")
-                           "' on ")
-                   'face ahg-header-line-face)
-                  (propertize default-directory 'face ahg-header-line-root-face)
-                  "\n" (make-string (1- (window-width (selected-window))) ?-)
-                  "\n\n"))))
+             (beginning-of-buffer))
          (ahg-show-error process)))
      buffer)))
 
@@ -1152,11 +1159,18 @@ Commands:
 arguments. SENTINEL is a sentinel function. BUFFER is the
 destination buffer. If nil, a new buffer will be used."
   (unless buffer (setq buffer (generate-new-buffer "*ahg-command*")))
+  (with-current-buffer buffer
+    (setq mode-line-process
+          (list (concat ":" (propertize "%s" 'face '(:foreground "#DD0000"))))))
   (let ((process
          (apply 'start-process
                 (concat "*ahg-command-" command "*") buffer
                 "hg" command args)))
-    (set-process-sentinel process (indirect-function sentinel))))
+    (set-process-sentinel process
+                          (lexical-let ((sf sentinel))
+                            (lambda (p s)
+                              (setq mode-line-process nil)
+                              (funcall sf p s))))))
 
 (defun ahg-show-error (process)
   "Displays an error message for the given process."
@@ -1164,7 +1178,7 @@ destination buffer. If nil, a new buffer will be used."
     (pop-to-buffer buf)
     (beginning-of-buffer)
     (ahg-command-mode)
-    (message "aHg error executing: %s"
+    (message "aHg command exited with non-zero status: %s"
              (mapconcat 'identity (process-command process) " "))))
 
 (define-derived-mode ahg-command-mode nil "aHg command"
