@@ -1167,18 +1167,17 @@ destination buffer. If nil, a new buffer will be used."
   (with-current-buffer buffer
     (setq mode-line-process
           (list (concat ":" (propertize "%s" 'face '(:foreground "#DD0000"))))))
-  (message "aHg: executing 'hg %s %s'..."
-           command (mapconcat 'identity args " "))
+  (message "aHg: executing hg '%s' command..." command)
   (let ((process
          (apply 'start-process
                 (concat "*ahg-command-" command "*") buffer
                 "hg" command args)))
     (set-process-sentinel process
-                          (lexical-let ((sf sentinel))
+                          (lexical-let ((sf sentinel)
+                                        (cmd command))
                             (lambda (p s)
-                              (message "aHg: executing '%s'...done"
-                                       (mapconcat 'identity
-                                                  (process-command p) " "))
+                              (message "aHg: executing hg '%s' command...done"
+                                       cmd)
                               (setq mode-line-process nil)
                               (funcall sf p s))))
     ))
