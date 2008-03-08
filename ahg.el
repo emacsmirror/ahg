@@ -206,6 +206,7 @@ the current dir is not under hg."
     (puthash "A" ahg-status-added-face h)
     (puthash "R" ahg-status-removed-face h)
     (puthash "C" ahg-status-clean-face h)
+    (puthash "=" ahg-status-clean-face h) ;; for Mercurial > 0.9.5
     (puthash "!" ahg-status-deleted-face h)
     (puthash "I" ahg-status-ignored-face h)
     (puthash "?" ahg-status-unknown-face h)
@@ -226,6 +227,7 @@ the current dir is not under hg."
 Commands:
 \\{ahg-status-mode-map}
 "
+  (buffer-disable-undo) ;; undo info not needed here
   (toggle-read-only t)
   (font-lock-mode nil)
   (define-key ahg-status-mode-map (kbd "C-h") 'describe-mode)
@@ -643,6 +645,7 @@ ahg-status, and it has an ewoc associated with it."
 Commands:
 \\{ahg-short-log-mode-map}
 "
+  (buffer-disable-undo) ;; undo info not needed here
   (use-local-map ahg-short-log-mode-map)
   (font-lock-mode nil)
   (easy-menu-add ahg-short-log-mode-menu ahg-short-log-mode-map))
@@ -870,6 +873,7 @@ don't ask for revisions."
 Commands:
 \\{ahg-log-mode-map}
 "
+  (buffer-disable-undo) ;; undo info not needed here
   (toggle-read-only t)
   (define-key ahg-log-mode-map (kbd "C-h") 'describe-mode)
   (define-key ahg-log-mode-map [?g] 'ahg-log)
@@ -1163,6 +1167,8 @@ destination buffer. If nil, a new buffer will be used."
   (with-current-buffer buffer
     (setq mode-line-process
           (list (concat ":" (propertize "%s" 'face '(:foreground "#DD0000"))))))
+  (message "aHg: executing 'hg %s %s'..."
+           command (mapconcat 'identity args " "))
   (let ((process
          (apply 'start-process
                 (concat "*ahg-command-" command "*") buffer
@@ -1170,8 +1176,12 @@ destination buffer. If nil, a new buffer will be used."
     (set-process-sentinel process
                           (lexical-let ((sf sentinel))
                             (lambda (p s)
+                              (message "aHg: executing '%s'...done"
+                                       (mapconcat 'identity
+                                                  (process-command p) " "))
                               (setq mode-line-process nil)
-                              (funcall sf p s))))))
+                              (funcall sf p s))))
+    ))
 
 (defun ahg-show-error (process)
   "Displays an error message for the given process."
@@ -1188,6 +1198,7 @@ destination buffer. If nil, a new buffer will be used."
 Commands:
 \\{ahg-command-mode-map}
 "
+  (buffer-disable-undo) ;; undo info not needed here
   (toggle-read-only t)
   (font-lock-mode nil)
   (define-key ahg-command-mode-map "h" 'ahg-command-help)
