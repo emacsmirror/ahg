@@ -76,6 +76,11 @@ command output." :group 'ahg :type 'boolean)
 command output, instead of waiting for the command to finish."
   :group 'ahg :type 'boolean)
 
+(defcustom ahg-auto-refresh-status-buffer t
+  "If non-nil, automatically refresh the *aHg status* buffer when certain
+operations (e.g. add, remove, commit) are performed."
+  :group 'ahg :type 'boolean)
+
 (defcustom ahg-restore-window-configuration-on-quit t
   "If non-nil, when `ahg-buffer-quit' will restore the window configuration."
   :group 'ahg :type 'boolean)
@@ -432,8 +437,9 @@ the singleton list with the node at point."
 
 
 (defun ahg-status-maybe-refresh ()
-  (let ((buf (ahg-get-status-buffer (ahg-root))))
-    (when buf (ahg-status))))
+  (when ahg-auto-refresh-status-buffer
+    (let ((buf (ahg-get-status-buffer (ahg-root))))
+      (when buf (ahg-status)))))
 
 
 (defun ahg-status-diff (&optional all)
@@ -578,8 +584,8 @@ ahg-status, and it has an ewoc associated with it."
                      (n (length (log-edit-files))))
          (lambda (process status)
            (if (string= status "finished\n")
-               (let ((buf (ahg-get-status-buffer aroot)))
-                 (when buf (ahg-status))
+               (progn
+                 (ahg-status-maybe-refresh)
                  (message "Successfully committed %s."
                           (if (> n 0)
                               (format "%d file%s" n (if (> n 1) "s" ""))
