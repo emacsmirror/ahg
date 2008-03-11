@@ -26,7 +26,7 @@ For a list of features, see the `Quick Guide`_ section below.
 Download
 --------
 
-An hg repository can be found at http://wxglade.sf.net/hg/ahg
+An hg repository can be found at http://freehg.org/u/agriggio/ahg
 
 
 Installation
