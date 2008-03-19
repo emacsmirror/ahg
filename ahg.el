@@ -39,6 +39,7 @@
                       ["Detailed Log" ahg-log t]
                       ["Commit Current File" ahg-commit-cur-file t]
                       ["View Changes of Current File" ahg-diff-cur-file t]
+                      ["View Change Log of Current File" ahg-log-cur-file t]
                       ["Execute Hg Command" ahg-do-command t]
                       ["Help on Hg Command" ahg-command-help t])
                     "PCL-CVS")
@@ -52,6 +53,7 @@
     (define-key map "h" 'ahg-command-help)
     (define-key map "c" 'ahg-commit-cur-file)
     (define-key map "=" 'ahg-diff-cur-file)
+    (define-key map (kbd "C-l") 'ahg-log-cur-file)
     map))
 
 ;;-----------------------------------------------------------------------------
@@ -956,6 +958,8 @@ buffer, do nothing."
     (when rev-pos
       (goto-char rev-pos))))
 
+(defvar ahg-dir-name-for-log-command nil)
+  
 (defun ahg-log (r1 r2)
   "Run hg log. When run interactively with a positve prefix
 argument, don't ask for revisions."
@@ -980,19 +984,29 @@ argument, don't ask for revisions."
         (ahg-push-window-configuration)))
     (ahg-generic-command
      "log" command-list
-     (lambda (process status)
-       (if (string= status "finished\n")
-           (progn
-             (pop-to-buffer (process-buffer process))
-             (ahg-log-mode)
-             (beginning-of-buffer)
-             (let ((inhibit-read-only t))
-               (insert
-                (propertize "hg log for " 'face ahg-header-line-face)
-                (propertize default-directory 'face ahg-header-line-root-face)
-                "\n\n")))
-         (ahg-show-error process)))
+     (lexical-let ((dn (or ahg-dir-name-for-log-command default-directory)))
+       (lambda (process status)
+         (if (string= status "finished\n")
+             (progn
+               (pop-to-buffer (process-buffer process))
+               (ahg-log-mode)
+               (beginning-of-buffer)
+               (let ((inhibit-read-only t))
+                 (insert
+                  (propertize "hg log for " 'face ahg-header-line-face)
+                  (propertize dn 'face ahg-header-line-root-face)
+                  "\n\n")))
+           (ahg-show-error process))))
      buffer)))
+
+(defun ahg-log-cur-file ()
+  (interactive)
+  (cond ((eq major-mode 'ahg-status-mode) (call-interactively 'ahg-status-log))
+        ((buffer-file-name)
+         (let ((ahg-file-list-for-log-command (list (buffer-file-name)))
+               (ahg-dir-name-for-log-command (buffer-file-name)))
+           (ahg-log "tip" "0")))
+        (t (message "hg log: no file found, aborting."))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg diff
