@@ -1145,7 +1145,7 @@ Commands:
              (pop-to-buffer (current-buffer))
              (beginning-of-buffer))
          (ahg-show-error process)))
-     buffer)))
+     buffer t)))
 
 ;;-----------------------------------------------------------------------------
 ;; hg help
@@ -1179,7 +1179,7 @@ Commands:
     (ahg-pop-window-configuration)
     (kill-buffer buf)))
 
-(defun ahg-generic-command (command args sentinel &optional buffer)
+(defun ahg-generic-command (command args sentinel &optional buffer use-shell)
   "Executes then given hg command, with the given
 arguments. SENTINEL is a sentinel function. BUFFER is the
 destination buffer. If nil, a new buffer will be used."
@@ -1189,7 +1189,7 @@ destination buffer. If nil, a new buffer will be used."
           (list (concat ":" (propertize "%s" 'face '(:foreground "#DD0000"))))))
   (message "aHg: executing hg '%s' command..." command)
   (let ((process
-         (apply 'start-process
+         (apply (if use-shell 'start-process-shell-command 'start-process)
                 (concat "*ahg-command-" command "*") buffer
                 "hg" command args)))
     (set-process-sentinel process
