@@ -602,8 +602,10 @@ ahg-status, and it has an ewoc associated with it."
     (log-edit
      'ahg-commit-callback
      nil
-     (list (cons 'log-edit-listfun
-                 (lexical-let ((flist files)) (lambda () flist))))
+     (if (version< emacs-version "22.2")
+         (lexical-let ((flist files)) (lambda () flist))
+       (list (cons 'log-edit-listfun
+                   (lexical-let ((flist files)) (lambda () flist)))))
      buf)))
 
 (defun ahg-commit-cur-file ()
