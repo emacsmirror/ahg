@@ -658,6 +658,7 @@ Commands:
   (buffer-disable-undo) ;; undo info not needed here
   (use-local-map ahg-short-log-mode-map)
   (font-lock-mode nil)
+  (hl-line-mode t)
   (easy-menu-add ahg-short-log-mode-menu ahg-short-log-mode-map))
 
 (easy-menu-define ahg-short-log-mode-menu ahg-short-log-mode-map "aHg Short Log"
