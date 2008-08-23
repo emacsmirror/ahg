@@ -1119,13 +1119,15 @@ Commands:
   (let* ((args (split-string cmdstring))
          (cmdname (car args))
          (buffer (get-buffer-create (concat "*hg command: "
-                                            (ahg-root) "*"))))
+                                            (ahg-root) "*")))
+         (curdir default-directory))
     (when ahg-do-command-extra-args
       (setq args (append args ahg-do-command-extra-args)))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (ahg-command-mode)
         (erase-buffer)
+        (setq default-directory curdir)
         (ahg-push-window-configuration)))
     (when ahg-do-command-show-buffer-immediately
       (pop-to-buffer buffer))
