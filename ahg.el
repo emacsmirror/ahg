@@ -313,8 +313,10 @@ Commands:
   "Run hg status. When called non-interactively, it is possible
 to pass extra switches to hg status."
   (interactive)
-  (let ((buf (get-buffer-create "*aHg-status*")))
+  (let ((buf (get-buffer-create "*aHg-status*"))
+        (curdir default-directory))
     (with-current-buffer buf
+      (setq default-directory curdir)
       (set (make-local-variable 'ahg-root) (ahg-root))
       (ahg-push-window-configuration))
     (ahg-generic-command "status" extra-switches 'ahg-status-sentinel buf)))
