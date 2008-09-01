@@ -289,7 +289,7 @@ Commands:
     ["Short Log" ahg-short-log [:keys "l" :active t]]
     ["Detailed Log" ahg-log [:keys "L" :active t]]
     ["Diff" ahg-status-diff [:keys "=" :active t]]
-    ["Diff All" ahg-status-diff-all [:keys "D" :active t]]
+    ["Diff Marked" ahg-status-diff-all [:keys "D" :active t]]
     ["--" nil nil]
     ("Show"
      ["All" ahg-status-show-all [:keys "sA" :active t]]
@@ -447,24 +447,33 @@ the singleton list with the node at point."
 
 
 (defun ahg-status-diff (&optional all)
+  "Shows changes of the current revision wrt. its parent. If ALL is t,
+shows changes of all marked files. Otherwise, shows changes of
+the file on the current line."
   (interactive)
-  (let ((files (ahg-status-get-marked (if all 'all 'cur)))
+  (let ((files
+         (if all (ahg-status-get-marked 'all)
+           (let ((n (ewoc-locate ewoc))) (when n (list (ewoc-data n))))))
+;;         (ahg-status-get-marked (if all 'all 'cur)))
         (buf (get-buffer-create "*aHg diff*"))
         (inhibit-read-only t)
         (args (when ahg-diff-use-git-format '("--git"))))
-    (with-current-buffer buf
-      (erase-buffer)
-      (ahg-push-window-configuration))
-    (ahg-generic-command "diff" (append args (mapcar 'cddr files))
-                         (lambda (process status)
-                            (if (string= status "finished\n")
-                                (progn
-                                  (pop-to-buffer (process-buffer process))
-                                  (ahg-diff-mode)
-                                  (set-buffer-modified-p nil)
-                                  (beginning-of-buffer))
-                              (ahg-show-error process)))
-                         buf)))
+    (cond ((null files) (message "aHg diff: no file selected."))
+          (t      
+           (with-current-buffer buf
+             (erase-buffer)
+             (ahg-push-window-configuration))
+           (ahg-generic-command "diff" (append args (mapcar 'cddr files))
+                                (lambda (process status)
+                                  (if (string= status "finished\n")
+                                      (progn
+                                        (pop-to-buffer (process-buffer process))
+                                        (ahg-diff-mode)
+                                        (set-buffer-modified-p nil)
+                                        (beginning-of-buffer))
+                                    (ahg-show-error process)))
+                                buf)))
+     ))
 
 (defun ahg-status-diff-all ()
   (interactive)
@@ -797,6 +806,25 @@ do nothing."
     command-list))
 
 
+;; helper function used by ahg-short-log, ahg-log and ahg-log-cur-file to
+;; get arguments from the user
+(defun ahg-log-read-args (is-on-selected-files read-extra-flags)
+  (append
+   (list (read-string
+          (concat "hg log"
+                  (if is-on-selected-files " (on selected files)" "")
+                  ", R1: ") "tip")
+         (read-string
+           (concat "hg log"
+                   (if is-on-selected-files " (on selected files)" "")
+                   ", R2: ") "0"))
+    (when read-extra-flags
+      (list (read-string
+             (concat "hg log"
+                     (if is-on-selected-files " (on selected files)" "")
+                     ", extra switches: ") "")))))
+
+
 (defun ahg-short-log-create-ewoc ()
   (let* ((width (window-width (selected-window)))
          (header (concat
@@ -812,28 +840,24 @@ do nothing."
 
 (defvar ahg-file-list-for-log-command nil)
 
-(defun ahg-short-log (r1 r2)
+(defun ahg-short-log (r1 r2 &optional extra-flags)
   "Run hg log, in a compressed format.
 This displays the log in a tabular view, one line per
-changeset. The format of each line is: Revision | Date | User |
-Summary.  When run interactively with a positve prefix argument,
-don't ask for revisions."
+changeset. The format of each line is: Revision | Date | User | Summary.
+R1 and R2 specify the range of revisions to
+consider. When run interactively, the user must enter their
+values (which default to tip for R1 and 0 for R2). If called with
+a prefix argument, prompts also for EXTRA-FLAGS."
   (interactive
-   (list (read-string
-          (concat "hg log"
-                  (if ahg-file-list-for-log-command " (on selected files)" "")
-                  ", R1: ") "tip")
-         (read-string
-          (concat "hg log"
-                  (if ahg-file-list-for-log-command " (on selected files)" "")
-                  ", R2: ") "0")))
+   (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))  
   (let ((buffer (get-buffer-create
                  (concat "*hg log (summary): " (ahg-root) "*")))
         (command-list (ahg-args-add-revs r1 r2)))  
     (setq command-list
           (append command-list
                   (list "--template"
-                        "{rev} {date|shortdate} {author|user} {desc|firstline}\\n")))
+                        "{rev} {date|shortdate} {author|user} {desc|firstline}\\n")
+                  (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
     (with-current-buffer buffer
@@ -965,22 +989,18 @@ buffer, do nothing."
 
 (defvar ahg-dir-name-for-log-command nil)
   
-(defun ahg-log (r1 r2)
-  "Run hg log. When run interactively with a positve prefix
-argument, don't ask for revisions."
+(defun ahg-log (r1 r2 &optional extra-flags)
+  "Run hg log. R1 and R2 specify the range of revisions to
+consider. When run interactively, the user must enter their
+values (which default to tip for R1 and 0 for R2). If called with
+a prefix argument, prompts also for EXTRA-FLAGS."
   (interactive
-   (list (read-string
-          (concat "hg log"
-                  (if ahg-file-list-for-log-command " (on selected files)" "")
-                  ", R1: ") "tip")
-         (read-string
-          (concat "hg log"
-                  (if ahg-file-list-for-log-command " (on selected files)" "")
-                  ", R2: ") "0")))
+   (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))
   (let ((buffer (get-buffer-create
                  (concat "*hg log (details): " (ahg-root) "*")))
         (command-list (ahg-args-add-revs r1 r2)))  
-    (setq command-list (append command-list (list "-v")))
+    (setq command-list (append command-list (list "-v")
+                               (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
     (with-current-buffer buffer
@@ -1004,13 +1024,20 @@ argument, don't ask for revisions."
            (ahg-show-error process))))
      buffer)))
 
-(defun ahg-log-cur-file ()
-  (interactive)
+(defun ahg-log-cur-file (&optional prefix)
+  "Shows changelog of the current file. When called interactively
+with a prefix argument, prompt for a revision range. If the
+prefix argument is the list (16) (corresponding to C-u C-u),
+prompts also for extra flags."
+  (interactive "P")
   (cond ((eq major-mode 'ahg-status-mode) (call-interactively 'ahg-status-log))
         ((buffer-file-name)
          (let ((ahg-file-list-for-log-command (list (buffer-file-name)))
                (ahg-dir-name-for-log-command (buffer-file-name)))
-           (ahg-log "tip" "0")))
+           (if prefix
+               (apply 'ahg-log   
+                      (ahg-log-read-args nil (equal current-prefix-arg '(16))))
+             (ahg-log "tip" "0"))))
         (t (message "hg log: no file found, aborting."))))
 
 ;;-----------------------------------------------------------------------------
