@@ -40,6 +40,15 @@
                       ["Commit Current File" ahg-commit-cur-file t]
                       ["View Changes of Current File" ahg-diff-cur-file t]
                       ["View Change Log of Current File" ahg-log-cur-file t]
+                      ("Mercurial Queues"
+                       ["New patch" ahg-qnew t]
+                       ["Refresh current patch" ahg-qrefresh t]
+                       ["Go to patch..." ahg-qgoto t]
+                       ["Pop all patches" ahg-qpop-all t]
+                       ["Show name of current patch" ahg-qtop t]
+                       ["Delete patch..." ahg-qdelete t]
+                       ["Convert current patch to changeset"
+                        ahg-mq-convert-patch-to-changeset t])
                       ["Execute Hg Command" ahg-do-command t]
                       ["Help on Hg Command" ahg-command-help t])
                     "PCL-CVS")
@@ -54,6 +63,16 @@
     (define-key map "c" 'ahg-commit-cur-file)
     (define-key map "=" 'ahg-diff-cur-file)
     (define-key map (kbd "C-l") 'ahg-log-cur-file)
+    (define-key map "Q"
+      (let ((qmap (make-sparse-keymap)))
+        (define-key qmap "n" 'ahg-qnew)
+        (define-key qmap "r" 'ahg-qrefresh)
+        (define-key qmap "g" 'ahg-qgoto)
+        (define-key qmap "p" 'ahg-qpop-all)
+        (define-key qmap "t" 'ahg-qtop)
+        (define-key qmap "d" 'ahg-qdelete)
+        (define-key qmap "c" 'ahg-mq-convert-patch-to-changeset)
+        qmap))
     map))
 
 ;;-----------------------------------------------------------------------------
@@ -267,6 +286,12 @@ Commands:
     (define-key showmap "u" 'ahg-status-show-unknown)
     (define-key showmap "i" 'ahg-status-show-ignored)
     (define-key ahg-status-mode-map "s" showmap))
+  (let ((qmap (make-sparse-keymap)))
+    (define-key qmap "n" 'ahg-qnew)
+    (define-key qmap "r" 'ahg-qrefresh)
+    (define-key qmap "g" 'ahg-qgoto)
+    (define-key qmap "p" 'ahg-qpop-all)
+    (define-key ahg-status-mode-map "Q" qmap))
   (easy-menu-add ahg-status-mode-menu ahg-status-mode-map))
 
 (easy-menu-define ahg-status-mode-menu ahg-status-mode-map "aHg Status"
@@ -301,6 +326,16 @@ Commands:
      ["Unknown" ahg-status-show-unknown [:keys "su" :active t]]
      ["Ignored" ahg-status-show-ignored [:keys "si" :active t]]
      )
+    ["--" nil nil]
+    ("Mercurial Queues"
+     ["New patch" ahg-qnew [:keys "Qn" :active t]]
+     ["Refresh current patch" ahg-qrefresh [:keys "Qr" :active t]]
+     ["Go to patch..." ahg-qgoto [:keys "Qg" :active t]]
+     ["Pop all patches" ahg-qpop-all [:keys "Qp" :active t]]
+     ["Show name of current patch" ahg-qtop [:keys "Qt" :active t]]
+     ["Delete patch..." ahg-qdelete [:keys "Qd" :active t]]
+     ["Convert current patch to changeset"
+      ahg-mq-convert-patch-to-changeset [:keys "Qc" :active t]])
     ["--" nil nil]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
@@ -1208,6 +1243,248 @@ Commands:
              (beginning-of-buffer))
          (ahg-show-error process)))
      buffer)))
+
+;;-----------------------------------------------------------------------------
+;; MQ support
+;;-----------------------------------------------------------------------------
+
+(defun ahg-mq-log-callback (cmdname &optional extraargs)
+  "Callback function to edit log messages for mq commands."
+  (interactive)
+  (let ((msg (buffer-string)))
+    (let ((args (append (list "-m" msg)
+                        extraargs
+                        (log-edit-files))))
+      (ahg-generic-command
+       cmdname args
+       (lexical-let ((aroot (ahg-root))
+                     (n (length (log-edit-files)))
+                     (cmdn cmdname))
+         (lambda (process status)
+           (if (string= status "finished\n")
+               (progn
+                 (ahg-status-maybe-refresh)
+                 (message "mq command %s successful." cmdn)
+                 (kill-buffer (process-buffer process)))
+             (ahg-show-error process)))))))
+  (kill-buffer (current-buffer)))
+
+(defun ahg-complete-mq-patch-name (patchname)
+  "Function to complete patch names, according to the result of the
+hg qseries command."
+  (with-temp-buffer
+    (let ((process-environment (cons "LANG=" process-environment))) 
+      (if (= (call-process "hg" nil t nil "qseries") 0)
+          (let (out)
+            (beginning-of-buffer)
+            (while (not (or (looking-at "^$") (eobp)))
+              (let* ((curname (buffer-substring-no-properties
+                               (point-at-bol) (point-at-eol)))
+                     (ok (compare-strings patchname 0 nil curname 0 nil)))
+                (when (or (eq ok t) (= (- ok) (1+ (length patchname))))
+                  (setq out (cons curname out)))
+                (beginning-of-line)
+                (forward-line 1)))
+            (nreverse out))
+        ;; here, we silently ignore errors, and return an empty completion
+        nil))))
+
+(defun ahg-qnew (patchname force edit-log-message)
+  "Create a new mq patch PATCHNAME. If FORCE is non-nil, use the -f switch.
+If EDIT-LOG-MESSAGE is non-nil, pop a buffer to enter a commit
+message to use instead of the default one. When called
+interactively, the name of the patch and the FORCE flag are read
+from the minibuffer, and EDIT-LOG-MESSAGE is non-nil only if
+called with a prefix argument. If FORCE is true and the function
+is called interactively from a aHg status buffer, only the
+selected files will be incorporated into the patch."
+  (interactive
+   (list (read-string "Patch name: ")
+         (y-or-n-p "Import outstanding changes into patch? ")
+         current-prefix-arg))
+  (let ((buf (generate-new-buffer "*aHg-log*"))
+        (files (when (eq major-mode 'ahg-status-mode)
+                 (mapcar 'cddr (ahg-status-get-marked nil)))))
+    (if edit-log-message
+        (log-edit
+         (lexical-let ((force force))
+           (lambda () (interactive)
+             (ahg-mq-log-callback "qnew" (when force (list "-f")))))
+         nil
+         (if (version< emacs-version "22.2")
+             (lexical-let ((flist (cons patchname files))) (lambda () flist))
+           (list (cons 'log-edit-listfun
+                       (lexical-let ((flist (cons patchname files)))
+                         (lambda () flist)))))
+         buf)
+      ;; else
+      (ahg-generic-command
+       "qnew" (append (when force (list "-f")) (list patchname) files)
+       (lexical-let ((aroot (ahg-root)))
+         (lambda (process status)
+           (if (string= status "finished\n")
+               (progn
+                 (ahg-status-maybe-refresh)
+                 (message "mq command qnew successful.")
+                 (kill-buffer (process-buffer process)))
+             (ahg-show-error process)))))
+       )))
+
+(defun ahg-qrefresh (get-log-message)
+  "Refreshes the current mq patch. If GET-LOG-MESSAGE is non-nil,
+a buffer will pop up to enter the commit message. When called
+interactively, GET-LOG-MESSAGE is non-nil only if called with a
+prefix arg. If called interactively from a aHg status buffer,
+only the selected files will be refreshed."
+  (interactive "P")
+  (let ((buf (when get-log-message (generate-new-buffer "*aHg-log*")))
+        (files (when (eq major-mode 'ahg-status-mode)
+                 (mapcar 'cddr (ahg-status-get-marked nil)))))
+    (if get-log-message
+        (log-edit
+         (lambda () (interactive) (ahg-mq-log-callback "qrefresh"))
+         nil
+         (if (version< emacs-version "22.2")
+             (lexical-let ((flist files)) (lambda () flist))
+           (list (cons 'log-edit-listfun
+                       (lexical-let ((flist files)) (lambda () flist)))))
+         buf)
+      (ahg-generic-command
+       "qrefresh" files
+       (lexical-let ((aroot (ahg-root)))
+         (lambda (process status)
+           (if (string= status "finished\n")
+               (progn
+                 (ahg-status-maybe-refresh)
+                 (message "mq command qrefresh successful.")
+                 (kill-buffer (process-buffer process)))
+             (ahg-show-error process))))))))
+
+(defun ahg-qgoto (patchname force)
+  "Puts the given mq patch PATCHNAME on the top of the stack. If
+FORCE is non-nil, discard local changes (passing -f to hg). When
+called interactively, PATCHNAME is read from the minibuffer,
+while FORCE is read only if called with a prefix arg (and it is
+set to nil otherwise)."
+  (interactive
+   (list (completing-read "Go to patch: "
+                          (dynamic-completion-table ahg-complete-mq-patch-name))
+         (and current-prefix-arg (y-or-n-p "Overwrite local changes? "))))
+  (let ((args (if force (list "-f" patchname) (list patchname))))
+    (ahg-generic-command
+     "qgoto" args
+     (lexical-let ((aroot (ahg-root)))
+       (lambda (process status)
+         (if (string= status "finished\n")
+             (progn
+               (ahg-status-maybe-refresh)
+               (let ((msg
+                      (with-current-buffer (process-buffer process)
+                        (end-of-buffer)
+                        (forward-char -1)
+                        (beginning-of-line)
+                        (buffer-substring-no-properties
+                         (point-at-bol) (point-at-eol)))))
+                 (message msg))
+               (kill-buffer (process-buffer process)))
+           (ahg-show-error process)))))))
+
+(defun ahg-qpop-all (force)
+  "Pops all patches off the mq stack. If FORCE is non-nil,
+discards any local changes. When called interactively, FORCE is
+read from the minibuffer if called with a prefix arg, and is nil
+otherwise."
+  (interactive
+   (list (and current-prefix-arg (y-or-n-p "Forget local changes? "))))
+  (let ((args (if force (list "-f" "-a") (list "-a"))))
+    (ahg-generic-command
+     "qpop" args
+     (lexical-let ((aroot (ahg-root)))
+       (lambda (process status)
+         (if (string= status "finished\n")
+             (progn
+               (ahg-status-maybe-refresh)
+               (let ((msg
+                      (with-current-buffer (process-buffer process)
+                        (end-of-buffer)
+                        (forward-char -1)
+                        (beginning-of-line)
+                        (buffer-substring-no-properties
+                         (point-at-bol) (point-at-eol)))))
+                 (message msg))
+               (kill-buffer (process-buffer process)))
+           (ahg-show-error process)))))))
+
+(defun ahg-qtop ()
+  "Shows the name of the mq patch currently at the top of the stack."
+  (interactive)
+  (ahg-generic-command
+   "qtop" nil
+   (lambda (process status)
+     (if (string= status "finished\n")
+         (progn
+           (let ((msg
+                  (with-current-buffer (process-buffer process)
+                    (end-of-buffer)
+                    (forward-char -1)
+                    (beginning-of-line)
+                    (buffer-substring-no-properties
+                     (point-at-bol) (point-at-eol)))))
+             (message msg))
+           (kill-buffer (process-buffer process)))
+       (ahg-show-error process)))))
+
+(defun ahg-qdelete (patchname)
+  "Deletes the given patch PATCHNAME. When called interactively,
+read the name from the minibuffer."
+  (interactive
+   (list
+    (completing-read "Delete patch: "
+                     (dynamic-completion-table ahg-complete-mq-patch-name))))
+  (ahg-generic-command
+   "qdelete" (list patchname)
+   (lexical-let ((patchname patchname))
+     (lambda (process status)
+       (if (string= status "finished\n")
+           (progn
+             (message "Deleted mq patch %s" patchname)
+             (kill-buffer (process-buffer process)))
+         (ahg-show-error process))))))
+
+
+(defun ahg-mq-convert-patch-to-changeset-callback ()
+  (interactive)
+  (ahg-generic-command ;; first, we refresh the patch with the new log message
+   "qrefresh" (list "-m" (buffer-string))
+   (lambda (process status)
+     (if (string= status "finished\n")
+         (progn 
+           (ahg-generic-command ;; if successful, we then try to convert it to
+                                ;; a regular changeset.
+            "qdelete" (list "--rev" "tip")
+            (lambda (process status)
+              (if (string= status "finished\n")
+                  (progn
+                    (ahg-status-maybe-refresh)
+                    (kill-buffer (process-buffer process)))
+                ;; note that if this second command fails, we still have
+                ;; changed the log message... This is not nice, but at the
+                ;; moment I don't know how to fix it
+                (ahg-show-error process))))
+           (kill-buffer (process-buffer process)))
+       (ahg-show-error process)))))                    
+
+(defun ahg-mq-convert-patch-to-changeset ()
+  "Converts the current patch to a regular changeset. Pops a
+buffer for entering the commit message."
+  (interactive)
+  (let ((buf (generate-new-buffer "*aHg-log*")))
+    (log-edit
+     'ahg-mq-convert-patch-to-changeset-callback
+     nil
+     (if (version< emacs-version "22.2") (lambda () nil)
+       (list (cons 'log-edit-listfun (lambda () nil))))
+     buf)))     
 
 ;;-----------------------------------------------------------------------------
 ;; Various helper functions
