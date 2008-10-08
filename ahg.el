@@ -686,6 +686,7 @@ ahg-status, and it has an ewoc associated with it."
     (define-key map [?g] 'ahg-short-log)
     (define-key map [?s] 'ahg-status)
     (define-key map [?=] 'ahg-short-log-view-diff)
+    (define-key map [?D] 'ahg-short-log-view-diff-with-other)
     (define-key map [? ] 'ahg-short-log-view-details)
     (define-key map [?\r] 'ahg-short-log-view-details)
     (define-key map [?r] 'ahg-short-log-goto-revision)
@@ -724,6 +725,8 @@ Commands:
 (easy-menu-define ahg-short-log-mode-menu ahg-short-log-mode-map "aHg Short Log"
   '("aHg Short Log"
     ["View Revision Diff" ahg-short-log-view-diff [:keys "=" :active t]]
+    ["View Revision Diff with Other..." ahg-short-log-view-diff-select-rev
+     [:keys "D" :active t]]
     ["View Revision Details" ahg-short-log-view-details [:keys " " :active t]]
     ["--" nil nil]
     ["Status" ahg-status [:keys "s" :active t]]
@@ -796,6 +799,12 @@ Commands:
         (r2 "tip"))
     (when (string-to-number r1)
       (setq r2 (number-to-string (1- (string-to-number r1)))))
+    (ahg-diff r2 r1)))
+
+(defun ahg-short-log-view-diff-select-rev (rev)
+  (interactive "sEnter revision to compare against: ")
+  (let ((r1 (ahg-short-log-revision-at-point))
+        (r2 rev))
     (ahg-diff r2 r1)))
 
 (defun ahg-short-log-view-details ()
@@ -965,6 +974,7 @@ Commands:
   (define-key ahg-log-mode-map [?g] 'ahg-log)
   (define-key ahg-log-mode-map [?s] 'ahg-status)
   (define-key ahg-log-mode-map [?=] 'ahg-log-view-diff)
+  (define-key ahg-log-mode-map [?D] 'ahg-log-view-diff-select-rev)
   (define-key ahg-log-mode-map [?n] 'ahg-log-next)
   (define-key ahg-log-mode-map "\t" 'ahg-log-next)
   (define-key ahg-log-mode-map [?p] 'ahg-log-previous)
@@ -978,6 +988,8 @@ Commands:
 (easy-menu-define ahg-log-mode-menu ahg-log-mode-map "aHg Log"
   '("aHg Log"
     ["View Revision Diff" ahg-log-view-diff [:keys "=" :active t]]
+    ["View Revision Diff with Other..." ahg-log-view-diff-select-rev
+     [:keys "D" :active t]]
     ["--" nil nil]
     ["Status" ahg-status [:keys "s" :active t]]
     ["Hg Command" ahg-do-command [:keys "!" :active t]]
@@ -1013,6 +1025,12 @@ Commands:
         (r2 "tip"))
     (when (string-to-number r1)
       (setq r2 (number-to-string (1- (string-to-number r1)))))
+    (ahg-diff r2 r1)))
+
+(defun ahg-log-view-diff-select-rev (rev)
+  (interactive "sEnter revision to compare against: ")
+  (let ((r1 (ahg-log-revision-at-point t))
+        (r2 rev))
     (ahg-diff r2 r1)))
 
 (defun ahg-log-revision-at-point (&optional short-id)
