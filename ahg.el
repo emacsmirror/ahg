@@ -456,8 +456,11 @@ the file on the current line."
            (let ((n (ewoc-locate ewoc))) (when n (list (ewoc-data n))))))
 ;;         (ahg-status-get-marked (if all 'all 'cur)))
         (buf (get-buffer-create "*aHg diff*"))
+        (curdir default-directory)
         (inhibit-read-only t)
         (args (when ahg-diff-use-git-format '("--git"))))
+    (with-current-buffer buf
+      (setq default-directory curdir))
     (cond ((null files) (message "aHg diff: no file selected."))
           (t      
            (with-current-buffer buf
@@ -1063,8 +1066,11 @@ Commands:
     (unless r1
       (setq r1 (read-string "hg diff, R1: " "tip"))
       (setq r2 (read-string "hg diff, R2: " ""))))
-  (let ((buffer (get-buffer-create "*hg diff*"))
-        (command-list (ahg-args-add-revs r1 r2 t)))
+  (let ((buffer (get-buffer-create "*aHg diff*"))
+        (command-list (ahg-args-add-revs r1 r2 t))
+        (curdir default-directory))
+    (with-current-buffer buffer
+      (setq default-directory curdir))
     (when ahg-diff-use-git-format
       (setq command-list (cons "--git" command-list)))
     (when files
