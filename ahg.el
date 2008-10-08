@@ -795,10 +795,8 @@ Commands:
 
 (defun ahg-short-log-view-diff ()
   (interactive)
-  (let ((r1 (ahg-short-log-revision-at-point))
-        (r2 "tip"))
-    (when (string-to-number r1)
-      (setq r2 (number-to-string (1- (string-to-number r1)))))
+  (let* ((r1 (ahg-short-log-revision-at-point))
+         (r2 (ahg-first-parent-of-rev r1)))
     (ahg-diff r2 r1)))
 
 (defun ahg-short-log-view-diff-select-rev (rev)
@@ -1021,10 +1019,8 @@ Commands:
 
 (defun ahg-log-view-diff ()
   (interactive)
-  (let ((r1 (ahg-log-revision-at-point t))
-        (r2 "tip"))
-    (when (string-to-number r1)
-      (setq r2 (number-to-string (1- (string-to-number r1)))))
+  (let* ((r1 (ahg-log-revision-at-point t))
+         (r2 (ahg-first-parent-of-rev r1)))
     (ahg-diff r2 r1)))
 
 (defun ahg-log-view-diff-select-rev (rev)
@@ -1518,6 +1514,16 @@ buffer for entering the commit message."
 ;;-----------------------------------------------------------------------------
 ;; Various helper functions
 ;;-----------------------------------------------------------------------------
+
+(defun ahg-first-parent-of-rev (rev)
+  (with-temp-buffer
+    (let ((process-environment (cons "LANG=" process-environment)))
+      (if (= (call-process "hg" nil t nil "parents"
+                           "-r" rev "--template" "{rev}") 0)
+          (buffer-string)
+        (if (string-to-number rev)
+            (number-to-string (1- (string-to-number rev)))
+          0)))))
 
 (defun ahg-buffer-quit ()
   (interactive)
