@@ -57,6 +57,7 @@
                        ["Go to patch..." ahg-qgoto t]
                        ["Pop all patches" ahg-qpop-all t]
                        ["Show name of current patch" ahg-qtop t]
+                       ["List all patches" ahg-mq-list-patches t]
                        ["Delete patch..." ahg-qdelete t]
                        ["Convert current patch to changeset"
                         ahg-mq-convert-patch-to-changeset t])
@@ -83,6 +84,7 @@
         (define-key qmap "t" 'ahg-qtop)
         (define-key qmap "d" 'ahg-qdelete)
         (define-key qmap "c" 'ahg-mq-convert-patch-to-changeset)
+        (define-key qmap "l" 'ahg-mq-list-patches)
         qmap))
     map))
 
@@ -302,6 +304,10 @@ Commands:
     (define-key qmap "r" 'ahg-qrefresh)
     (define-key qmap "g" 'ahg-qgoto)
     (define-key qmap "p" 'ahg-qpop-all)
+    (define-key qmap "t" 'ahg-qtop)
+    (define-key qmap "d" 'ahg-qdelete)
+    (define-key qmap "c" 'ahg-mq-convert-patch-to-changeset)
+    (define-key qmap "l" 'ahg-mq-list-patches)
     (define-key ahg-status-mode-map "Q" qmap))
   (easy-menu-add ahg-status-mode-menu ahg-status-mode-map))
 
@@ -344,6 +350,7 @@ Commands:
      ["Go to patch..." ahg-qgoto [:keys "Qg" :active t]]
      ["Pop all patches" ahg-qpop-all [:keys "Qp" :active t]]
      ["Show name of current patch" ahg-qtop [:keys "Qt" :active t]]
+     ["List all patches" ahg-mq-list-patches [:keys "Ql" :active t]]
      ["Delete patch..." ahg-qdelete [:keys "Qd" :active t]]
      ["Convert current patch to changeset"
       ahg-mq-convert-patch-to-changeset [:keys "Qc" :active t]])
@@ -1509,7 +1516,73 @@ buffer for entering the commit message."
      nil
      (if (version< emacs-version "22.2") (lambda () nil)
        (list (cons 'log-edit-listfun (lambda () nil))))
-     buf)))     
+     buf)))
+
+
+(defun ahg-mq-show-patches-buffer (buf patches applied curdir)
+  (with-current-buffer buf
+    (let ((inihibit-read-only t))
+      (erase-buffer)
+      (setq default-directory curdir)
+      (ahg-push-window-configuration)
+      (beginning-of-buffer)
+      (insert
+       (propertize "mq patches for " 'face ahg-header-line-face)
+       (propertize default-directory 'face ahg-header-line-root-face)
+       "\n\n")
+      (let ((idx 0)
+            (r (make-string (window-width (selected-window)) ?-)))
+        (insert
+         (propertize r 'face 'bold) "\n"
+         (propertize " Index | App | Patch\n" 'face 'bold)
+         (propertize r 'face 'bold) "\n")
+        (mapcar
+         (lambda (patch)
+           (when (not (string-match patch "[ \t]+"))
+             (insert (format "% 6d |  %s  | %s\n" idx
+                             (if (member patch applied) "*" " ") patch))
+             (setq idx (1+ idx))))
+         patches)
+        (insert (propertize r 'face 'bold) "\n"))
+      (beginning-of-buffer)
+      (ahg-command-mode)))
+  (pop-to-buffer buf))
+
+(defun ahg-mq-list-patches ()
+  (interactive)
+  (let ((buf (get-buffer-create
+              (format "*aHg mq patches for: %s*" (ahg-root)))))
+    (ahg-generic-command
+     "qseries" nil
+     (lexical-let ((buf buf)
+                   (curdir default-directory))
+       (lambda (process status) ;; parse output of hg qseries
+         (if (string= status "finished\n")
+             (let ((patches
+                    (with-current-buffer (process-buffer process)
+                      (split-string (buffer-string) "\n"))))
+               (kill-buffer (process-buffer process))
+               (ahg-generic-command
+                "qapplied" nil
+                (lexical-let ((buf buf)
+                              (patches patches)
+                              (curdir curdir))
+                  (lambda (process status) ;; parse output of hg qapplied
+                    (if (string= status "finished\n")
+                        (let ((applied
+                               (with-current-buffer (process-buffer process)
+                                 (split-string (buffer-string) "\n"))))
+                          (kill-buffer (process-buffer process))
+                          ;; and show the buffer
+                          (ahg-mq-show-patches-buffer
+                           buf patches applied curdir))
+                      ;; error in hg qapplied
+                      (kill-buffer buf)
+                      (ahg-show-error process))))))
+           ;; error in hg qseries
+           (kill-buffer buf)
+           (ahg-show-error process))))
+     )))
 
 ;;-----------------------------------------------------------------------------
 ;; Various helper functions
