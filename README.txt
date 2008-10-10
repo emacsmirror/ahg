@@ -67,6 +67,9 @@ Commit Current File:
 View Changes of Current File:
    Displays changes of current file wrt. the tip of the repository.
 
+Mercurial Queues:
+   Support for basic commands of the mq extension.
+
 Execute Hg Command:
    Lets you execute an arbitrary hg command. The focus goes to the minibuffer,
    where you can enter the command to execute. You don't have to type ``hg``,
@@ -81,9 +84,9 @@ Help on Hg Command:
 aHg buffers
 ~~~~~~~~~~~
 
-The ``Status``, ``Log Summary`` and ``Detailed Log`` display their results on
-special buffers. Each of these has its own menu, with further available
-commands.
+The ``Status``, ``Log Summary``, ``Detailed Log`` and the ``List of MQ
+Patches`` commands display their results on special buffers. Each of these has
+its own menu, with further available commands.
 
 
 Customization
