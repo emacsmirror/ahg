@@ -1642,13 +1642,16 @@ Commands:
 (defun ahg-mq-patch-pp (data)
   "Pretty-printer for mq patches patch list."
   ;; data is a 4-elements list: index, applied, patch name, guards
-  (insert (propertize
-           (format "% 6d |  %s  | %s %s" (car data)
+  (let* ((s (format "% 6d |  %s  | %s %s" (car data)
                    (if (cadr data) "*" " ") (caddr data)
                    (if (not (string= (car (cadddr data)) "unguarded"))
-                       (cadddr data) ""))
-           'mouse-face 'highlight
-           'keymap ahg-mq-patches-line-map)))
+                       (cadddr data) "")))
+         (width (window-width (selected-window)))
+         (pad (if (< (length s) width)
+                  (make-string (- width (length s)) ? ) "")))
+    (insert (propertize (concat s pad)
+                        'mouse-face 'highlight
+                        'keymap ahg-mq-patches-line-map))))
 
 (defun ahg-mq-patches-insert-contents (ewoc patches applied guards)
   (let ((idx 0))
