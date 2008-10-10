@@ -53,6 +53,7 @@
                       ["View Change Log of Current File" ahg-log-cur-file t]
                       ("Mercurial Queues"
                        ["New patch" ahg-qnew t]
+                       ["View Qdiff" ahg-qdiff t]
                        ["Refresh current patch" ahg-qrefresh t]
                        ["Go to patch..." ahg-qgoto t]
                        ["Pop all patches" ahg-qpop-all t]
@@ -60,7 +61,8 @@
                        ["List all patches" ahg-mq-list-patches t]
                        ["Delete patch..." ahg-qdelete t]
                        ["Convert current patch to changeset"
-                        ahg-mq-convert-patch-to-changeset t])
+                        ahg-mq-convert-patch-to-changeset t]
+                       ["Edit series file" ahg-mq-edit-series t])
                       ["Execute Hg Command" ahg-do-command t]
                       ["Help on Hg Command" ahg-command-help t])
                     "PCL-CVS")
@@ -78,6 +80,7 @@
     (define-key map "Q"
       (let ((qmap (make-sparse-keymap)))
         (define-key qmap "n" 'ahg-qnew)
+        (define-key qmap "=" 'ahg-qdiff)
         (define-key qmap "r" 'ahg-qrefresh)
         (define-key qmap "g" 'ahg-qgoto)
         (define-key qmap "p" 'ahg-qpop-all)
@@ -85,6 +88,7 @@
         (define-key qmap "d" 'ahg-qdelete)
         (define-key qmap "c" 'ahg-mq-convert-patch-to-changeset)
         (define-key qmap "l" 'ahg-mq-list-patches)
+        (define-key qmap "e" 'ahg-mq-edit-series)
         qmap))
     map))
 
@@ -301,6 +305,7 @@ Commands:
     (define-key ahg-status-mode-map "s" showmap))
   (let ((qmap (make-sparse-keymap)))
     (define-key qmap "n" 'ahg-qnew)
+    (define-key qmap "=" 'ahg-qdiff)
     (define-key qmap "r" 'ahg-qrefresh)
     (define-key qmap "g" 'ahg-qgoto)
     (define-key qmap "p" 'ahg-qpop-all)
@@ -308,6 +313,7 @@ Commands:
     (define-key qmap "d" 'ahg-qdelete)
     (define-key qmap "c" 'ahg-mq-convert-patch-to-changeset)
     (define-key qmap "l" 'ahg-mq-list-patches)
+    (define-key qmap "e" 'ahg-mq-edit-series)
     (define-key ahg-status-mode-map "Q" qmap))
   (easy-menu-add ahg-status-mode-menu ahg-status-mode-map))
 
@@ -346,6 +352,7 @@ Commands:
     ["--" nil nil]
     ("Mercurial Queues"
      ["New patch" ahg-qnew [:keys "Qn" :active t]]
+     ["View Qdiff" ahg-qdiff [:keys "Q=" :active t]]
      ["Refresh current patch" ahg-qrefresh [:keys "Qr" :active t]]
      ["Go to patch..." ahg-qgoto [:keys "Qg" :active t]]
      ["Pop all patches" ahg-qpop-all [:keys "Qp" :active t]]
@@ -353,7 +360,8 @@ Commands:
      ["List all patches" ahg-mq-list-patches [:keys "Ql" :active t]]
      ["Delete patch..." ahg-qdelete [:keys "Qd" :active t]]
      ["Convert current patch to changeset"
-      ahg-mq-convert-patch-to-changeset [:keys "Qc" :active t]])
+      ahg-mq-convert-patch-to-changeset [:keys "Qc" :active t]]
+     ["Edit series file" ahg-mq-edit-series [:keys "Qe" :active t]])
     ["--" nil nil]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
@@ -369,7 +377,7 @@ to pass extra switches to hg status."
   (let ((buf (get-buffer-create "*aHg-status*"))
         (curdir default-directory))
     (with-current-buffer buf
-      (setq default-directory curdir)
+      (setq default-directory (file-name-as-directory curdir))
       (set (make-local-variable 'ahg-root) (ahg-root))
       (ahg-push-window-configuration))
     (ahg-generic-command "status" extra-switches 'ahg-status-sentinel buf)))
@@ -513,7 +521,7 @@ the file on the current line."
         (inhibit-read-only t)
         (args (when ahg-diff-use-git-format '("--git"))))
     (with-current-buffer buf
-      (setq default-directory curdir))
+      (setq default-directory (file-name-as-directory curdir)))
     (cond ((null files) (message "aHg diff: no file selected."))
           (t      
            (with-current-buffer buf
@@ -1137,7 +1145,7 @@ Commands:
         (command-list (ahg-args-add-revs r1 r2 t))
         (curdir default-directory))
     (with-current-buffer buffer
-      (setq default-directory curdir))
+      (setq default-directory (file-name-as-directory curdir)))
     (when ahg-diff-use-git-format
       (setq command-list (cons "--git" command-list)))
     (when files
@@ -1229,7 +1237,7 @@ Commands:
       (let ((inhibit-read-only t))
         (ahg-command-mode)
         (erase-buffer)
-        (setq default-directory curdir)
+        (setq default-directory (file-name-as-directory curdir))
         (ahg-push-window-configuration)))
     (when ahg-do-command-show-buffer-immediately
       (pop-to-buffer buffer))
@@ -1357,6 +1365,7 @@ selected files will be incorporated into the patch."
            (if (string= status "finished\n")
                (progn
                  (ahg-status-maybe-refresh)
+                 (ahg-mq-patches-maybe-refresh aroot)
                  (message "mq command qnew successful.")
                  (kill-buffer (process-buffer process)))
              (ahg-show-error process)))))
@@ -1388,6 +1397,7 @@ only the selected files will be refreshed."
            (if (string= status "finished\n")
                (progn
                  (ahg-status-maybe-refresh)
+;;                 (ahg-mq-patches-maybe-refresh aroot)
                  (message "mq command qrefresh successful.")
                  (kill-buffer (process-buffer process)))
              (ahg-show-error process))))))))
@@ -1410,6 +1420,7 @@ set to nil otherwise)."
          (if (string= status "finished\n")
              (progn
                (ahg-status-maybe-refresh)
+               (ahg-mq-patches-maybe-refresh aroot)
                (let ((msg
                       (with-current-buffer (process-buffer process)
                         (end-of-buffer)
@@ -1436,6 +1447,7 @@ otherwise."
          (if (string= status "finished\n")
              (progn
                (ahg-status-maybe-refresh)
+               (ahg-mq-patches-maybe-refresh aroot)
                (let ((msg
                       (with-current-buffer (process-buffer process)
                         (end-of-buffer)
@@ -1475,10 +1487,12 @@ read the name from the minibuffer."
                      (dynamic-completion-table ahg-complete-mq-patch-name))))
   (ahg-generic-command
    "qdelete" (list patchname)
-   (lexical-let ((patchname patchname))
+   (lexical-let ((patchname patchname)
+                 (aroot (ahg-root)))
      (lambda (process status)
        (if (string= status "finished\n")
            (progn
+             (ahg-mq-patches-maybe-refresh aroot)
              (message "Deleted mq patch %s" patchname)
              (kill-buffer (process-buffer process)))
          (ahg-show-error process))))))
@@ -1494,21 +1508,24 @@ read the name from the minibuffer."
            (ahg-generic-command ;; if successful, we then try to convert it to
                                 ;; a regular changeset.
             "qdelete" (list "--rev" "tip")
-            (lambda (process status)
-              (if (string= status "finished\n")
-                  (progn
-                    (ahg-status-maybe-refresh)
-                    (kill-buffer (process-buffer process)))
-                ;; note that if this second command fails, we still have
-                ;; changed the log message... This is not nice, but at the
-                ;; moment I don't know how to fix it
-                (ahg-show-error process))))
-           (kill-buffer (process-buffer process)))
-       (ahg-show-error process)))))                    
+            (lexical-let ((aroot (ahg-root)))
+              (lambda (process status)
+                (if (string= status "finished\n")
+                    (progn
+                      (ahg-status-maybe-refresh)
+                      (ahg-mq-patches-maybe-refresh aroot)
+                      (kill-buffer (process-buffer process)))
+                  ;; note that if this second command fails, we still have
+                  ;; changed the log message... This is not nice, but at the
+                  ;; moment I don't know how to fix it
+                  (ahg-show-error process)))))
+            (kill-buffer (process-buffer process)))
+       (ahg-show-error process)))))    
 
 (defun ahg-mq-convert-patch-to-changeset ()
-  "Converts the current patch to a regular changeset. Pops a
-buffer for entering the commit message."
+  "Tell mq to stop managing the current patch and convert it to a regular
+mercurial changeset. The patch must be applied and at the base of the stack.
+Pops a buffer for entering the commit message."
   (interactive)
   (let ((buf (generate-new-buffer "*aHg-log*")))
     (log-edit
@@ -1519,43 +1536,178 @@ buffer for entering the commit message."
      buf)))
 
 
+(defun ahg-qdiff (files)
+  "Shows a diff which includes the current mq patch as well as any
+changes which have been made in the working directory since the
+last refresh."
+  (interactive (list (when (eq major-mode 'ahg-status-mode) 
+                       (mapcar 'cddr (ahg-status-get-marked nil)))))
+  (let ((buf (get-buffer-create "*aHg diff*")))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (ahg-push-window-configuration)))
+    (ahg-generic-command
+     "qdiff" (if ahg-diff-use-git-format (append (list "--git") files) files)
+     (lexical-let ((aroot (file-name-as-directory (ahg-root))))
+       (lambda (process status)
+         (if (string= status "finished\n")
+             (progn
+               (pop-to-buffer (process-buffer process))
+               (setq default-directory aroot)
+               (ahg-diff-mode)
+               (beginning-of-buffer))
+           (ahg-show-error process))))
+     buf)))
+
+
+(defun ahg-mq-edit-series ()
+  (interactive)
+  ;; first, check whether there is any patch applied. If so, ask the user
+  ;; whethe (s)he wants to pop all patches before editing series
+  (let* ((some-patches-applied
+         (with-temp-buffer
+           (when (= (call-process "hg" nil t nil "tip" "--template" "{tags}") 0)
+             (let ((tags (split-string (buffer-string))))
+               (member "qtip" tags)))))
+         (pop (and some-patches-applied
+                   (y-or-n-p "Pop all patches before editing series? ")))
+         (edit-series (lambda (root)
+                        (find-file-other-window
+                         (concat (file-name-as-directory root)
+                                 ".hg/patches/series")))))
+      (if pop
+          (ahg-generic-command
+           "qpop" (list "--all")
+           (lexical-let ((aroot (ahg-root))
+                         (edit-series edit-series))
+             (lambda (process status)
+               (if (string= status "finished\n")
+                   (progn
+                     (ahg-status-maybe-refresh)
+                     (ahg-mq-patches-maybe-refresh aroot)
+                     (funcall edit-series aroot)
+                     (kill-buffer (process-buffer process)))
+                 (ahg-show-error process))))))
+      (funcall edit-series (ahg-root))))
+
+
+(defvar ahg-mq-patches-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [?q] 'ahg-buffer-quit)
+    (define-key map [?g] 'ahg-mq-list-patches)
+    (define-key map [?D] 'ahg-mq-patches-delete-patch)
+    (define-key map [?!] 'ahg-do-command)
+    (define-key map [?h] 'ahg-command-help)
+    (define-key map [?=] 'ahg-mq-patches-view-patch)
+    (define-key map [?\r] 'ahg-mq-patches-goto-patch)
+    map)
+  "Keymap used in `ahg-mq-patches-mode'.")
+
+(defvar ahg-mq-patches-line-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mouse-1] 'ahg-mq-patches-view-patch-mouse)
+    (define-key map [mouse-2] 'ahg-mq-patches-goto-patch-mouse)
+    map))
+
+(easy-menu-define ahg-mq-patches-mode-menu ahg-mq-patches-mode-map
+  "aHg MQ Patches"
+  '("aHg MQ Patches"
+    ["View Patch" ahg-mq-patches-view-patch [:keys "=" :active t]]
+    ["Go to Patch" ahg-mq-patches-goto-patch [:keys "\r" :active t]]
+    ["Delete Patch" ahg-mq-patches-delete-patch [:keys "D" :active t]]
+    ["Refresh" ahg-mq-list-patches [:keys "g" :active t]]
+    ["--" nil nil]
+    ["Hg Command" ahg-do-command [:keys "!" :active t]]
+    ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
+    ["--" nil nil]
+    ["Quit" ahg-buffer-quit [:keys "q" :active t]]
+    ))
+
+(define-derived-mode ahg-mq-patches-mode fundamental-mode "ahg-mq-patches"
+  "Major mode to display mq patch queues.
+
+Commands:
+\\{ahg-mq-patches-mode-map}
+"
+  (buffer-disable-undo) ;; undo info not needed here
+  (use-local-map ahg-mq-patches-mode-map)
+  (font-lock-mode nil)
+  ;;(hl-line-mode t)
+  (setq truncate-lines t)
+  (toggle-read-only t)
+  (easy-menu-add ahg-mq-patches-mode-menu ahg-mq-patches-mode-map)
+  )
+
+(defun ahg-mq-patch-pp (data)
+  "Pretty-printer for mq patches patch list."
+  ;; data is a 3-elements list: index, applied, patch name
+  (insert (propertize
+           (format "% 6d |  %s  | %s" (car data)
+                   (if (cadr data) "*" " ") (caddr data))
+           'mouse-face 'highlight
+           'keymap ahg-mq-patches-line-map)))
+
+(defun ahg-mq-patches-insert-contents (ewoc patches applied)
+  (let ((idx 0))
+    (mapcar
+     (lambda (patch)
+       (when (not (string-match patch "[ \t]+"))
+         (let ((data (list idx (member patch applied) patch)))
+           (setq idx (1+ idx))
+           (ewoc-enter-last ewoc data))))
+     patches)))
+
+(defun ahg-mq-patches-create-ewoc ()
+  (let* ((width (window-width (selected-window)))
+         (r (propertize (make-string width ?-) 'face 'bold))
+         (header (concat
+                  (propertize "mq patch queue for " 'face ahg-header-line-face)
+                  (propertize default-directory 'face ahg-header-line-root-face)
+                  "\n\n" r "\n"
+                  (propertize " Index | App | Patch\n" 'face 'bold) r))
+         (footer r)
+         (ew (ewoc-create 'ahg-mq-patch-pp header footer)))
+    ew))
+
 (defun ahg-mq-show-patches-buffer (buf patches applied curdir)
   (with-current-buffer buf
-    (let ((inihibit-read-only t))
+    (ahg-mq-patches-mode)    
+    (let ((inhibit-read-only t))
       (erase-buffer)
-      (setq default-directory curdir)
+      (setq default-directory (file-name-as-directory curdir))
       (ahg-push-window-configuration)
       (beginning-of-buffer)
-      (insert
-       (propertize "mq patches for " 'face ahg-header-line-face)
-       (propertize default-directory 'face ahg-header-line-root-face)
-       "\n\n")
-      (let ((idx 0)
-            (r (make-string (window-width (selected-window)) ?-)))
-        (insert
-         (propertize r 'face 'bold) "\n"
-         (propertize " Index | App | Patch\n" 'face 'bold)
-         (propertize r 'face 'bold) "\n")
-        (mapcar
-         (lambda (patch)
-           (when (not (string-match patch "[ \t]+"))
-             (insert (format "% 6d |  %s  | %s\n" idx
-                             (if (member patch applied) "*" " ") patch))
-             (setq idx (1+ idx))))
-         patches)
-        (insert (propertize r 'face 'bold) "\n"))
+      (let ((ew (ahg-mq-patches-create-ewoc)))
+        (ahg-mq-patches-insert-contents ew patches applied)
+        (set (make-local-variable 'ewoc) ew)))
+      (toggle-read-only t)
       (beginning-of-buffer)
-      (ahg-command-mode)))
+      (forward-line 1)
+      (set-buffer-modified-p nil)
+      (message " "))
   (pop-to-buffer buf))
 
-(defun ahg-mq-list-patches ()
+
+(defun ahg-mq-get-patches-buffer (root &optional dont-create)
+  (let* ((name (format "*aHg mq patches for: %s*" root))
+         (buf (if dont-create (get-buffer name) (get-buffer-create name))))
+    (when buf
+      (setq default-directory (file-name-as-directory root)))
+    buf))
+
+
+(defun ahg-mq-list-patches (&optional root)
+  "List all mq patches in the queue, showing also information
+about which are currently applied."
   (interactive)
-  (let ((buf (get-buffer-create
-              (format "*aHg mq patches for: %s*" (ahg-root)))))
+  (unless root (setq root (ahg-root)))
+  (let ((buf (ahg-mq-get-patches-buffer root)))
     (ahg-generic-command
      "qseries" nil
      (lexical-let ((buf buf)
-                   (curdir default-directory))
+                   (curdir default-directory)
+                   (aroot root))
        (lambda (process status) ;; parse output of hg qseries
          (if (string= status "finished\n")
              (let ((patches
@@ -1583,6 +1735,65 @@ buffer for entering the commit message."
            (kill-buffer buf)
            (ahg-show-error process))))
      )))
+
+
+(defun ahg-mq-patches-maybe-refresh (&optional root)
+  (when ahg-auto-refresh-status-buffer
+    (unless root
+      (setq root (ahg-root)))
+    (let ((buf (ahg-mq-get-patches-buffer root t))
+          (default-directory (file-name-as-directory root)))
+      (when buf (ahg-mq-list-patches root)))))
+
+
+(defun ahg-mq-patches-view-patch ()
+  "Display the patch at point in the patch list buffer."
+  (interactive)
+  (let ((patch (ahg-mq-patches-patch-at-point))
+        (root (ahg-root)))
+    (when patch
+      (find-file-other-window
+       (concat (file-name-as-directory root) ".hg/patches/" patch))
+      (ahg-diff-mode))))
+
+(defun ahg-mq-patches-patch-at-point ()
+  (let ((node (ewoc-locate ewoc)))
+    (and node (caddr (ewoc-data node)))))
+
+
+(defun ahg-mq-patches-goto-patch (force)
+  "Puts the patch at point in the patch list buffer on top of the
+stack of applied patches."
+  (interactive "P")
+  (let* ((patch (ahg-mq-patches-patch-at-point))
+         (ok (and patch (y-or-n-p (format "Go to patch %s? " patch)))))
+    (when ok
+      (ahg-qgoto patch force))))
+
+
+(defun ahg-mq-patches-view-patch-mouse (event)
+  (interactive "e")
+  (save-window-excursion
+    (select-window (posn-window (event-end event)) t)
+    (goto-char (posn-point (event-end event)))
+    (ahg-mq-patches-view-patch)))
+
+
+(defun ahg-mq-patches-goto-patch-mouse (event)
+  (interactive "e")
+  (save-window-excursion
+    (select-window (posn-window (event-end event)) t)
+    (goto-char (posn-point (event-end event)))
+    (ahg-mq-patches-goto-patch nil)))
+
+
+(defun ahg-mq-patches-delete-patch ()
+  "Deletes the patch at point in the patch list buffer."
+  (interactive)
+  (let* ((patch (ahg-mq-patches-patch-at-point))
+         (ok (and patch (y-or-n-p (format "Delete patch %s? " patch)))))
+    (when ok
+      (ahg-qdelete patch))))
 
 ;;-----------------------------------------------------------------------------
 ;; Various helper functions
