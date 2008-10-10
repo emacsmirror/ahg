@@ -1641,19 +1641,24 @@ Commands:
 
 (defun ahg-mq-patch-pp (data)
   "Pretty-printer for mq patches patch list."
-  ;; data is a 3-elements list: index, applied, patch name
+  ;; data is a 4-elements list: index, applied, patch name, guards
   (insert (propertize
-           (format "% 6d |  %s  | %s" (car data)
-                   (if (cadr data) "*" " ") (caddr data))
+           (format "% 6d |  %s  | %s %s" (car data)
+                   (if (cadr data) "*" " ") (caddr data)
+                   (if (not (string= (car (cadddr data)) "unguarded"))
+                       (cadddr data) ""))
            'mouse-face 'highlight
            'keymap ahg-mq-patches-line-map)))
 
-(defun ahg-mq-patches-insert-contents (ewoc patches applied)
+(defun ahg-mq-patches-insert-contents (ewoc patches applied guards)
   (let ((idx 0))
     (mapcar
      (lambda (patch)
        (when (not (string-match patch "[ \t]+"))
-         (let ((data (list idx (member patch applied) patch)))
+         (let ((data (list idx
+                           (member patch applied)
+                           patch
+                           (cdr (assoc patch guards)))))
            (setq idx (1+ idx))
            (ewoc-enter-last ewoc data))))
      patches)))
@@ -1665,12 +1670,12 @@ Commands:
                   (propertize "mq patch queue for " 'face ahg-header-line-face)
                   (propertize default-directory 'face ahg-header-line-root-face)
                   "\n\n" r "\n"
-                  (propertize " Index | App | Patch\n" 'face 'bold) r))
+                  (propertize " Index | App | Patch (Guards)\n" 'face 'bold) r))
          (footer r)
          (ew (ewoc-create 'ahg-mq-patch-pp header footer)))
     ew))
 
-(defun ahg-mq-show-patches-buffer (buf patches applied curdir)
+(defun ahg-mq-show-patches-buffer (buf patches applied guards curdir)
   (with-current-buffer buf
     (ahg-mq-patches-mode)    
     (let ((inhibit-read-only t))
@@ -1679,7 +1684,7 @@ Commands:
       (ahg-push-window-configuration)
       (beginning-of-buffer)
       (let ((ew (ahg-mq-patches-create-ewoc)))
-        (ahg-mq-patches-insert-contents ew patches applied)
+        (ahg-mq-patches-insert-contents ew patches applied guards)
         (set (make-local-variable 'ewoc) ew)))
       (toggle-read-only t)
       (beginning-of-buffer)
@@ -1725,9 +1730,30 @@ about which are currently applied."
                                (with-current-buffer (process-buffer process)
                                  (split-string (buffer-string) "\n"))))
                           (kill-buffer (process-buffer process))
-                          ;; and show the buffer
-                          (ahg-mq-show-patches-buffer
-                           buf patches applied curdir))
+                          ;; now, list guards as well
+                          (ahg-generic-command
+                           "qguard" (list "-l")
+                           (lexical-let ((buf buf)
+                                         (patches patches)
+                                         (applied applied)
+                                         (curdir curdir))
+                             (lambda (process status)
+                               (if (string= status "finished\n")
+                                   (let
+                                       ((guards
+                                         (with-current-buffer
+                                             (process-buffer process)
+                                           (mapcar
+                                            (lambda (s) (split-string s ": "))
+                                            (split-string
+                                             (buffer-string) "\n")))))
+                                     (kill-buffer (process-buffer process))
+                                     ;; and show the buffer
+                                     (ahg-mq-show-patches-buffer
+                                      buf patches applied guards curdir))
+                                 ;; error in hg qguard
+                                 (kill-buffer buf)
+                                 (ahg-show-error process))))))
                       ;; error in hg qapplied
                       (kill-buffer buf)
                       (ahg-show-error process))))))
