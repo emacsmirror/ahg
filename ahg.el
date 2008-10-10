@@ -1601,6 +1601,8 @@ last refresh."
     (define-key map [?h] 'ahg-command-help)
     (define-key map [?=] 'ahg-mq-patches-view-patch)
     (define-key map [?\r] 'ahg-mq-patches-goto-patch)
+    (define-key map [?p] 'ahg-qpop-all)
+    (define-key map [?n] 'ahg-qnew)
     map)
   "Keymap used in `ahg-mq-patches-mode'.")
 
@@ -1615,12 +1617,14 @@ last refresh."
   '("aHg MQ Patches"
     ["View Patch" ahg-mq-patches-view-patch [:keys "=" :active t]]
     ["Go to Patch" ahg-mq-patches-goto-patch [:keys "\r" :active t]]
+    ["New Patch..." ahg-qnew [:keys "n" :active t]]
     ["Delete Patch" ahg-mq-patches-delete-patch [:keys "D" :active t]]
-    ["Refresh" ahg-mq-list-patches [:keys "g" :active t]]
+    ["Pop All Patches" ahg-qpop-all [:keys "p" :active t]]
     ["--" nil nil]
     ["Hg Command" ahg-do-command [:keys "!" :active t]]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
+    ["Refresh" ahg-mq-list-patches [:keys "g" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]
     ))
 
