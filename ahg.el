@@ -1359,7 +1359,8 @@ is called interactively from a aHg status buffer, only the
 selected files will be incorporated into the patch."
   (interactive
    (list (read-string "Patch name: ")
-         (ahg-y-or-n-p "Import outstanding changes into patch? ")
+         (and (ahg-uncommitted-changes-p)
+              (ahg-y-or-n-p "Import outstanding changes into patch? "))
          current-prefix-arg))
   (let ((buf (generate-new-buffer "*aHg-log*"))
         (files (when (eq major-mode 'ahg-status-mode)
@@ -1424,13 +1425,13 @@ only the selected files will be refreshed."
 (defun ahg-qgoto (patchname force)
   "Puts the given mq patch PATCHNAME on the top of the stack. If
 FORCE is non-nil, discard local changes (passing -f to hg). When
-called interactively, PATCHNAME is read from the minibuffer,
-while FORCE is read only if called with a prefix arg (and it is
-set to nil otherwise)."
+called interactively, PATCHNAME and FORCE are read from the minibuffer.
+"
   (interactive
    (list (completing-read "Go to patch: "
                           (dynamic-completion-table ahg-complete-mq-patch-name))
-         (and current-prefix-arg (ahg-y-or-n-p "Overwrite local changes? "))))
+         (and (ahg-uncommitted-changes-p)
+              (ahg-y-or-n-p "Overwrite local changes? "))))
   (let ((args (if force (list "-f" patchname) (list patchname))))
     (ahg-generic-command
      "qgoto" args
@@ -1454,10 +1455,11 @@ set to nil otherwise)."
 (defun ahg-qpop-all (force)
   "Pops all patches off the mq stack. If FORCE is non-nil,
 discards any local changes. When called interactively, FORCE is
-read from the minibuffer if called with a prefix arg, and is nil
-otherwise."
+read from the minibuffer.
+"
   (interactive
-   (list (and current-prefix-arg (ahg-y-or-n-p "Forget local changes? "))))
+   (list (and (ahg-uncommitted-changes-p)
+              (ahg-y-or-n-p "Forget local changes? "))))
   (let ((args (if force (list "-f" "-a") (list "-a"))))
     (ahg-generic-command
      "qpop" args
@@ -1934,6 +1936,13 @@ Commands:
   (if ahg-yesno-short-prompt
       (y-or-n-p prompt)
     (yes-or-no-p prompt)))
+
+(defun ahg-uncommitted-changes-p (&optional root)
+  (with-temp-buffer
+    (let ((args (if root (list "hg" nil t nil "-R" root "id" "-n")
+                  (list "hg" nil t nil "id" "-n"))))
+      (when (= (apply 'call-process args) 0)
+        (= (char-before (1- (point-max))) ?+)))))
 
 
 (provide 'ahg)
