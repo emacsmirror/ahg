@@ -51,6 +51,7 @@
                       ["Commit Current File" ahg-commit-cur-file t]
                       ["View Changes of Current File" ahg-diff-cur-file t]
                       ["View Change Log of Current File" ahg-log-cur-file t]
+                      ["--" nil nil]
                       ("Mercurial Queues"
                        ["New patch" ahg-qnew t]
                        ["View Qdiff" ahg-qdiff t]
@@ -63,6 +64,7 @@
                        ["Convert current patch to changeset"
                         ahg-mq-convert-patch-to-changeset t]
                        ["Edit series file" ahg-mq-edit-series t])
+                      ["--" nil nil]
                       ["Execute Hg Command" ahg-do-command t]
                       ["Help on Hg Command" ahg-command-help t])
                     "PCL-CVS")
