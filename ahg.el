@@ -1703,7 +1703,7 @@ Commands:
          (ew (ewoc-create 'ahg-mq-patch-pp header footer)))
     ew))
 
-(defun ahg-mq-show-patches-buffer (buf patches applied guards curdir)
+(defun ahg-mq-show-patches-buffer (buf patches applied guards curdir no-pop)
   (with-current-buffer buf
     (ahg-mq-patches-mode)    
     (let ((inhibit-read-only t))
@@ -1719,7 +1719,8 @@ Commands:
       (forward-line 1)
       (set-buffer-modified-p nil)
       (message " "))
-  (pop-to-buffer buf))
+  (unless no-pop
+    (pop-to-buffer buf)))
 
 
 (defun ahg-mq-get-patches-buffer (root &optional dont-create)
@@ -1729,6 +1730,8 @@ Commands:
       (setq default-directory (file-name-as-directory root)))
     buf))
 
+
+(defvar ahg-mq-list-patches-no-pop nil)
 
 (defun ahg-mq-list-patches (&optional root)
   "List all mq patches in the queue, showing also information
@@ -1740,7 +1743,8 @@ about which are currently applied."
      "qseries" nil
      (lexical-let ((buf buf)
                    (curdir default-directory)
-                   (aroot root))
+                   (aroot root)
+                   (no-pop ahg-mq-list-patches-no-pop))
        (lambda (process status) ;; parse output of hg qseries
          (if (string= status "finished\n")
              (let ((patches
@@ -1751,7 +1755,8 @@ about which are currently applied."
                 "qapplied" nil
                 (lexical-let ((buf buf)
                               (patches patches)
-                              (curdir curdir))
+                              (curdir curdir)
+                              (no-pop no-pop))
                   (lambda (process status) ;; parse output of hg qapplied
                     (if (string= status "finished\n")
                         (let ((applied
@@ -1764,7 +1769,8 @@ about which are currently applied."
                            (lexical-let ((buf buf)
                                          (patches patches)
                                          (applied applied)
-                                         (curdir curdir))
+                                         (curdir curdir)
+                                         (no-pop no-pop))
                              (lambda (process status)
                                (if (string= status "finished\n")
                                    (let
@@ -1778,7 +1784,8 @@ about which are currently applied."
                                      (kill-buffer (process-buffer process))
                                      ;; and show the buffer
                                      (ahg-mq-show-patches-buffer
-                                      buf patches applied guards curdir))
+                                      buf patches applied guards curdir
+                                      no-pop))
                                  ;; error in hg qguard
                                  (kill-buffer buf)
                                  (ahg-show-error process))))))
@@ -1791,13 +1798,13 @@ about which are currently applied."
      )))
 
 
-(defun ahg-mq-patches-maybe-refresh (&optional root)
+(defun ahg-mq-patches-maybe-refresh (root)
   (when ahg-auto-refresh-status-buffer
-    (unless root
-      (setq root (ahg-root)))
     (let ((buf (ahg-mq-get-patches-buffer root t))
           (default-directory (file-name-as-directory root)))
-      (when buf (ahg-mq-list-patches root)))))
+      (when buf
+        (let ((ahg-mq-list-patches-no-pop t))
+          (ahg-mq-list-patches root))))))
 
 
 (defun ahg-mq-patches-view-patch ()
