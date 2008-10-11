@@ -382,7 +382,11 @@ to pass extra switches to hg status."
       (setq default-directory (file-name-as-directory curdir))
       (set (make-local-variable 'ahg-root) (ahg-root))
       (ahg-push-window-configuration))
-    (ahg-generic-command "status" extra-switches 'ahg-status-sentinel buf)))
+    (ahg-generic-command
+     "status" extra-switches
+     (lexical-let ((no-pop ahg-status-no-pop))
+       (lambda (process status)
+         (ahg-status-sentinel process status no-pop))) buf)))
 
 (defun ahg-status-pp (data)
   "Pretty-printer for data elements in a *hg status* buffer."
@@ -470,12 +474,13 @@ the singleton list with the node at point."
     (if (yes-or-no-p (format "Add %d files to hg? " (length files)))
         (ahg-generic-command
          "add" (mapcar 'cddr files)
-         (lexical-let ((howmany (length files)))
+         (lexical-let ((howmany (length files))
+                       (aroot (ahg-root)))
            (lambda (process status)
              (if (string= status "finished\n")
                  (with-current-buffer
                      (process-buffer process)
-                   (ahg-status-maybe-refresh)
+                   (ahg-status-maybe-refresh aroot)
                    (message "Added %d files" howmany))
                (ahg-show-error process)))))
       (message "hg add aborted"))))
@@ -489,11 +494,12 @@ the singleton list with the node at point."
     (if (yes-or-no-p (format "Remove %d files from hg? " (length files)))
         (ahg-generic-command
          "remove" (mapcar 'cddr files)
-         (lexical-let ((howmany (length files)))
+         (lexical-let ((howmany (length files))
+                       (aroot (ahg-root)))
            (lambda (process status)
              (if (string= status "finished\n")
                  (with-current-buffer (process-buffer process)
-                   (ahg-status-maybe-refresh)
+                   (ahg-status-maybe-refresh aroot)
                    (message "Removed %d files" howmany))
                (ahg-show-error process)))))
       (message "hg remove aborted"))))
@@ -503,10 +509,12 @@ the singleton list with the node at point."
   (ahg-status))
 
 
-(defun ahg-status-maybe-refresh ()
+(defun ahg-status-maybe-refresh (root)
   (when ahg-auto-refresh-status-buffer
-    (let ((buf (ahg-get-status-buffer (ahg-root))))
-      (when buf (ahg-status)))))
+    (let ((buf (ahg-get-status-buffer root)))
+      (when buf
+        (let ((ahg-status-no-pop t))
+          (ahg-status))))))
 
 
 (defun ahg-status-diff (&optional all)
@@ -551,13 +559,15 @@ the file on the current line."
     (if (yes-or-no-p
          (if files (format "Undo changes on %d files? " (length files))
            "Undo all changes? "))
-        (ahg-generic-command "revert" (if files (mapcar 'cddr files) '("--all"))
-                             (lambda (process status)
-                                (if (string= status "finished\n")
-                                    (with-current-buffer
-                                        (process-buffer process)
-                                      (ahg-status-maybe-refresh))
-                                  (ahg-show-error process))))
+        (ahg-generic-command
+         "revert" (if files (mapcar 'cddr files) '("--all"))
+         (lexical-let ((aroot (ahg-root)))
+           (lambda (process status)
+             (if (string= status "finished\n")
+                 (with-current-buffer
+                     (process-buffer process)
+                   (ahg-status-maybe-refresh aroot))
+               (ahg-show-error process)))))
       (message "hg revert aborted"))))                         
 
 
@@ -585,7 +595,9 @@ ahg-status, and it has an ewoc associated with it."
   (unless root (setq root (ahg-root)))
   (get-buffer (concat "*hg status: " root "*")))
 
-(defun ahg-status-sentinel (process status)
+(defvar ahg-status-no-pop nil)
+
+(defun ahg-status-sentinel (process status &optional no-pop)
   (with-temp-message (or (current-message) "")
     (if (string= status "finished\n")
         ;; everything was ok, we can show the status buffer
@@ -604,7 +616,8 @@ ahg-status, and it has an ewoc associated with it."
                            (buffer-substring (+ (point) 2) (point-at-eol)))))
               (forward-line 1)))
           (kill-buffer buf)
-          (pop-to-buffer outbuf)
+          (unless no-pop
+            (pop-to-buffer outbuf))
           (set (make-local-variable 'ahg-window-configuration) cfg)
           (let ((inhibit-read-only t)
                 (node (ewoc-nth ew 0)))
@@ -664,7 +677,7 @@ ahg-status, and it has an ewoc associated with it."
          (lambda (process status)
            (if (string= status "finished\n")
                (progn
-                 (ahg-status-maybe-refresh)
+                 (ahg-status-maybe-refresh aroot)
                  (message "Successfully committed %s."
                           (if (> n 0)
                               (format "%d file%s" n (if (> n 1) "s" ""))
@@ -1305,7 +1318,7 @@ Commands:
          (lambda (process status)
            (if (string= status "finished\n")
                (progn
-                 (ahg-status-maybe-refresh)
+                 (ahg-status-maybe-refresh aroot)
                  (message "mq command %s successful." cmdn)
                  (kill-buffer (process-buffer process)))
              (ahg-show-error process)))))))
@@ -1366,7 +1379,7 @@ selected files will be incorporated into the patch."
          (lambda (process status)
            (if (string= status "finished\n")
                (progn
-                 (ahg-status-maybe-refresh)
+                 (ahg-status-maybe-refresh aroot)
                  (ahg-mq-patches-maybe-refresh aroot)
                  (message "mq command qnew successful.")
                  (kill-buffer (process-buffer process)))
@@ -1398,7 +1411,7 @@ only the selected files will be refreshed."
          (lambda (process status)
            (if (string= status "finished\n")
                (progn
-                 (ahg-status-maybe-refresh)
+                 (ahg-status-maybe-refresh aroot)
 ;;                 (ahg-mq-patches-maybe-refresh aroot)
                  (message "mq command qrefresh successful.")
                  (kill-buffer (process-buffer process)))
@@ -1421,7 +1434,7 @@ set to nil otherwise)."
        (lambda (process status)
          (if (string= status "finished\n")
              (progn
-               (ahg-status-maybe-refresh)
+               (ahg-status-maybe-refresh aroot)
                (ahg-mq-patches-maybe-refresh aroot)
                (let ((msg
                       (with-current-buffer (process-buffer process)
@@ -1448,7 +1461,7 @@ otherwise."
        (lambda (process status)
          (if (string= status "finished\n")
              (progn
-               (ahg-status-maybe-refresh)
+               (ahg-status-maybe-refresh aroot)
                (ahg-mq-patches-maybe-refresh aroot)
                (let ((msg
                       (with-current-buffer (process-buffer process)
@@ -1514,7 +1527,7 @@ read the name from the minibuffer."
               (lambda (process status)
                 (if (string= status "finished\n")
                     (progn
-                      (ahg-status-maybe-refresh)
+                      (ahg-status-maybe-refresh aroot)
                       (ahg-mq-patches-maybe-refresh aroot)
                       (kill-buffer (process-buffer process)))
                   ;; note that if this second command fails, we still have
@@ -1586,7 +1599,7 @@ last refresh."
              (lambda (process status)
                (if (string= status "finished\n")
                    (progn
-                     (ahg-status-maybe-refresh)
+                     (ahg-status-maybe-refresh aroot)
                      (ahg-mq-patches-maybe-refresh aroot)
                      (funcall edit-series aroot)
                      (kill-buffer (process-buffer process)))
