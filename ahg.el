@@ -129,6 +129,10 @@ operations (e.g. add, remove, commit) are performed."
   "If non-nil, aHg commands that output a diff will use the git format."
   :group 'ahg :type 'boolean)
 
+(defcustom ahg-yesno-short-prompt t
+  "If non-nil, use short form (y or n) when asking for confimation to the user."
+  :group 'ahg :type 'boolean)
+
 (defface ahg-status-marked-face
   '((default (:inherit font-lock-preprocessor-face)))
   "Face for marked files in aHg status buffers." :group 'ahg)
@@ -471,7 +475,7 @@ the singleton list with the node at point."
   (interactive)
   (let ((files (ahg-status-get-marked
                 'all (lambda (data) (string= (cadr data) "?")))))
-    (if (yes-or-no-p (format "Add %d files to hg? " (length files)))
+    (if (ahg-y-or-n-p (format "Add %d files to hg? " (length files)))
         (ahg-generic-command
          "add" (mapcar 'cddr files)
          (lexical-let ((howmany (length files))
@@ -491,7 +495,7 @@ the singleton list with the node at point."
                  'all (lambda (data)
                         (let ((f (cadr data)))
                           (or (string= f "A") (string= f "C")))))))
-    (if (yes-or-no-p (format "Remove %d files from hg? " (length files)))
+    (if (ahg-y-or-n-p (format "Remove %d files from hg? " (length files)))
         (ahg-generic-command
          "remove" (mapcar 'cddr files)
          (lexical-let ((howmany (length files))
@@ -556,7 +560,7 @@ the file on the current line."
 (defun ahg-status-undo ()
   (interactive)
   (let ((files (ahg-status-get-marked nil)))
-    (if (yes-or-no-p
+    (if (ahg-y-or-n-p
          (if files (format "Undo changes on %d files? " (length files))
            "Undo all changes? "))
         (ahg-generic-command
@@ -1355,7 +1359,7 @@ is called interactively from a aHg status buffer, only the
 selected files will be incorporated into the patch."
   (interactive
    (list (read-string "Patch name: ")
-         (y-or-n-p "Import outstanding changes into patch? ")
+         (ahg-y-or-n-p "Import outstanding changes into patch? ")
          current-prefix-arg))
   (let ((buf (generate-new-buffer "*aHg-log*"))
         (files (when (eq major-mode 'ahg-status-mode)
@@ -1426,7 +1430,7 @@ set to nil otherwise)."
   (interactive
    (list (completing-read "Go to patch: "
                           (dynamic-completion-table ahg-complete-mq-patch-name))
-         (and current-prefix-arg (y-or-n-p "Overwrite local changes? "))))
+         (and current-prefix-arg (ahg-y-or-n-p "Overwrite local changes? "))))
   (let ((args (if force (list "-f" patchname) (list patchname))))
     (ahg-generic-command
      "qgoto" args
@@ -1453,7 +1457,7 @@ discards any local changes. When called interactively, FORCE is
 read from the minibuffer if called with a prefix arg, and is nil
 otherwise."
   (interactive
-   (list (and current-prefix-arg (y-or-n-p "Forget local changes? "))))
+   (list (and current-prefix-arg (ahg-y-or-n-p "Forget local changes? "))))
   (let ((args (if force (list "-f" "-a") (list "-a"))))
     (ahg-generic-command
      "qpop" args
@@ -1586,7 +1590,7 @@ last refresh."
              (let ((tags (split-string (buffer-string))))
                (member "qtip" tags)))))
          (pop (and some-patches-applied
-                   (y-or-n-p "Pop all patches before editing series? ")))
+                   (ahg-y-or-n-p "Pop all patches before editing series? ")))
          (edit-series (lambda (root)
                         (find-file-other-window
                          (concat (file-name-as-directory root)
@@ -1814,7 +1818,7 @@ about which are currently applied."
 stack of applied patches."
   (interactive "P")
   (let* ((patch (ahg-mq-patches-patch-at-point))
-         (ok (and patch (y-or-n-p (format "Go to patch %s? " patch)))))
+         (ok (and patch (ahg-y-or-n-p (format "Go to patch %s? " patch)))))
     (when ok
       (ahg-qgoto patch force))))
 
@@ -1839,7 +1843,7 @@ stack of applied patches."
   "Deletes the patch at point in the patch list buffer."
   (interactive)
   (let* ((patch (ahg-mq-patches-patch-at-point))
-         (ok (and patch (y-or-n-p (format "Delete patch %s? " patch)))))
+         (ok (and patch (ahg-y-or-n-p (format "Delete patch %s? " patch)))))
     (when ok
       (ahg-qdelete patch))))
 
@@ -1925,6 +1929,11 @@ Commands:
   (when (and ahg-restore-window-configuration-on-quit
              (boundp 'ahg-window-configuration))
     (set-window-configuration ahg-window-configuration)))
+
+(defun ahg-y-or-n-p (prompt)
+  (if ahg-yesno-short-prompt
+      (y-or-n-p prompt)
+    (yes-or-no-p prompt)))
 
 
 (provide 'ahg)
