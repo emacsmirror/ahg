@@ -673,7 +673,7 @@ ahg-status, and it has an ewoc associated with it."
 
 (defun ahg-commit-callback ()
   (interactive)
-  (let ((msg (buffer-string)))
+  (let ((msg (ahg-parse-commit-message)))
     (let ((args (append (list "-m" msg)
                         (log-edit-files))))
       (ahg-generic-command
@@ -695,13 +695,9 @@ ahg-status, and it has an ewoc associated with it."
 (defun ahg-commit (files)
   "Run hg commit. Pops up a buffer for editing the log file."
   (let ((buf (generate-new-buffer "*aHg-log*")))
-    (log-edit
+    (ahg-log-edit
      'ahg-commit-callback
-     nil
-     (if (version< emacs-version "22.2")
-         (lexical-let ((flist files)) (lambda () flist))
-       (list (cons 'log-edit-listfun
-                   (lexical-let ((flist files)) (lambda () flist)))))
+     (lexical-let ((flist files)) (lambda () flist))
      buf)))
 
 (defun ahg-commit-cur-file ()
@@ -1312,7 +1308,7 @@ Commands:
 (defun ahg-mq-log-callback (cmdname &optional extraargs)
   "Callback function to edit log messages for mq commands."
   (interactive)
-  (let ((msg (buffer-string)))
+  (let ((msg (ahg-parse-commit-message)))
     (let ((args (append (list "-m" msg)
                         extraargs
                         (log-edit-files))))
@@ -1368,16 +1364,11 @@ selected files will be incorporated into the patch."
         (files (when (eq major-mode 'ahg-status-mode)
                  (mapcar 'cddr (ahg-status-get-marked nil)))))
     (if edit-log-message
-        (log-edit
+        (ahg-log-edit
          (lexical-let ((force force))
            (lambda () (interactive)
              (ahg-mq-log-callback "qnew" (when force (list "-f")))))
-         nil
-         (if (version< emacs-version "22.2")
-             (lexical-let ((flist (cons patchname files))) (lambda () flist))
-           (list (cons 'log-edit-listfun
-                       (lexical-let ((flist (cons patchname files)))
-                         (lambda () flist)))))
+         (lexical-let ((flist (cons patchname files))) (lambda () flist))
          buf)
       ;; else
       (ahg-generic-command
@@ -1404,14 +1395,17 @@ only the selected files will be refreshed."
         (files (when (eq major-mode 'ahg-status-mode)
                  (mapcar 'cddr (ahg-status-get-marked nil)))))
     (if get-log-message
-        (log-edit
-         (lambda () (interactive) (ahg-mq-log-callback "qrefresh"))
-         nil
-         (if (version< emacs-version "22.2")
-             (lexical-let ((flist files)) (lambda () flist))
-           (list (cons 'log-edit-listfun
-                       (lexical-let ((flist files)) (lambda () flist)))))
-         buf)
+        (let* ((patchname
+                (with-temp-buffer
+                  (when (= (call-process "hg" nil t nil "qtop") 0)
+                    (buffer-substring-no-properties
+                     (point-min) (1- (point-max))))))
+               (msg (when patchname
+                      (concat "Refreshing mq patch: " patchname))))
+          (ahg-log-edit
+           (lambda () (interactive) (ahg-mq-log-callback "qrefresh"))
+           (lexical-let ((flist files)) (lambda () flist))
+           buf msg))
       (ahg-generic-command
        "qrefresh" files
        (lexical-let ((aroot (ahg-root)))
@@ -1524,7 +1518,7 @@ read the name from the minibuffer."
 (defun ahg-mq-convert-patch-to-changeset-callback ()
   (interactive)
   (ahg-generic-command ;; first, we refresh the patch with the new log message
-   "qrefresh" (list "-m" (buffer-string))
+   "qrefresh" (list "-m" (ahg-parse-commit-message))
    (lambda (process status)
      (if (string= status "finished\n")
          (progn 
@@ -1550,13 +1544,20 @@ read the name from the minibuffer."
 mercurial changeset. The patch must be applied and at the base of the stack.
 Pops a buffer for entering the commit message."
   (interactive)
-  (let ((buf (generate-new-buffer "*aHg-log*")))
-    (log-edit
+  (let* ((buf (generate-new-buffer "*aHg-log*"))
+         (patchname
+          (with-temp-buffer
+            (when (= (call-process "hg" nil t nil "qtop") 0)
+              (buffer-substring-no-properties
+               (point-min) (1- (point-max))))))
+         (msg (when patchname
+                (concat "Converting mq patch: " patchname
+                        " to regular changeset"))))
+    (ahg-log-edit
      'ahg-mq-convert-patch-to-changeset-callback
-     nil
-     (if (version< emacs-version "22.2") (lambda () nil)
-       (list (cons 'log-edit-listfun (lambda () nil))))
-     buf)))
+     (lambda () nil)
+     buf
+     msg)))
 
 
 (defun ahg-qdiff (files)
@@ -1954,6 +1955,75 @@ Commands:
                   (list "hg" nil t nil "id" "-n"))))
       (when (= (apply 'call-process args) 0)
         (= (char-before (1- (point-max))) ?+)))))
+
+;;-----------------------------------------------------------------------------
+;; log-edit related functions
+;;-----------------------------------------------------------------------------
+
+(defun ahg-log-edit-hook (&optional extra-message)
+  (end-of-buffer)
+  (let ((user
+         (with-temp-buffer
+           (if (= (call-process "hg" nil t nil "showconfig" "ui.username") 0)
+               (buffer-substring-no-properties (point-min) (1- (point-max)))
+             "")))
+        (branch
+         (with-temp-buffer
+           (if (= (call-process "hg" nil t nil "branch") 0)
+               (buffer-substring-no-properties (point-min) (1- (point-max)))
+             "")))
+        (changed (log-edit-files))
+        (root-regexp (concat "^" (regexp-quote default-directory))))
+    (insert
+     (format "
+
+HG: Enter commit message.  Lines beginning with 'HG:' are removed.
+%sHG: --
+HG: user: %s
+HG: root: %s
+HG: branch: %s
+HG: committing %s"
+             (if extra-message
+                 (concat
+                  (mapconcat (lambda (s) (concat "HG: " s))
+                             (split-string extra-message "\n") "\n") "\n")
+               "")
+             user
+             default-directory
+             branch
+             (if changed
+                 (mapconcat
+                  (lambda (s) (replace-regexp-in-string root-regexp "" s))
+                  changed " ")
+               "ALL CHANGES (run 'ahg-status' for the details)")))
+  (beginning-of-buffer)))
+
+(defun ahg-log-edit (callback file-list-function buffer &optional msg)
+  "Sets up a log-edit buffer for committing hg changesets."
+  (let ((log-edit-hook
+         (list (if msg (lexical-let ((msg msg))
+                         (lambda () (ahg-log-edit-hook msg)))
+                 'ahg-log-edit-hook))))
+    (log-edit
+     callback
+     t
+     (if (version< emacs-version "22.2") file-list-function
+       (list (cons 'log-edit-listfun file-list-function)))
+     buffer)))
+
+(defun ahg-parse-commit-message ()
+  "Returns the contents of the current buffer, discarding lines
+starting with 'HG:'."
+  (let ((out))
+    (beginning-of-buffer)
+    (while (not (eobp))
+      (unless (looking-at "^HG:")
+        (setq out
+              (cons
+               (buffer-substring-no-properties (point-at-bol) (point-at-eol))
+               out)))
+      (forward-line 1))
+    (mapconcat 'identity (nreverse out) "\n")))
 
 
 (provide 'ahg)
