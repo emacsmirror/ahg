@@ -383,6 +383,8 @@ to pass extra switches to hg status."
   (let ((buf (get-buffer-create "*aHg-status*"))
         (curdir default-directory))
     (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer))
       (setq default-directory (file-name-as-directory curdir))
       (set (make-local-variable 'ahg-root) (ahg-root))
       (ahg-push-window-configuration))
