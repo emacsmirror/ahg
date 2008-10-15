@@ -1612,8 +1612,8 @@ last refresh."
                      (ahg-mq-patches-maybe-refresh aroot)
                      (funcall edit-series aroot)
                      (kill-buffer (process-buffer process)))
-                 (ahg-show-error process))))))
-      (funcall edit-series (ahg-root))))
+                 (ahg-show-error process)))))
+        (funcall edit-series (ahg-root)))))
 
 
 (defvar ahg-mq-patches-mode-map
