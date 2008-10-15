@@ -1732,7 +1732,8 @@ Commands:
   (let* ((name (format "*aHg mq patches for: %s*" root))
          (buf (if dont-create (get-buffer name) (get-buffer-create name))))
     (when buf
-      (setq default-directory (file-name-as-directory root)))
+      (with-current-buffer buf
+        (setq default-directory (file-name-as-directory root))))
     buf))
 
 
