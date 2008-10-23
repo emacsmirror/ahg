@@ -1519,25 +1519,27 @@ read the name from the minibuffer."
   (interactive)
   (ahg-generic-command ;; first, we refresh the patch with the new log message
    "qrefresh" (list "-m" (ahg-parse-commit-message))
-   (lambda (process status)
-     (if (string= status "finished\n")
-         (progn 
-           (ahg-generic-command ;; if successful, we then try to convert it to
-                                ;; a regular changeset.
-            "qdelete" (list "--rev" "tip")
-            (lexical-let ((aroot (ahg-root)))
-              (lambda (process status)
-                (if (string= status "finished\n")
-                    (progn
-                      (ahg-status-maybe-refresh aroot)
-                      (ahg-mq-patches-maybe-refresh aroot)
-                      (kill-buffer (process-buffer process)))
-                  ;; note that if this second command fails, we still have
-                  ;; changed the log message... This is not nice, but at the
-                  ;; moment I don't know how to fix it
-                  (ahg-show-error process)))))
-            (kill-buffer (process-buffer process)))
-       (ahg-show-error process)))))    
+   (lexical-let ((log-buffer (current-buffer)))
+     (lambda (process status)
+       (kill-buffer log-buffer)
+       (if (string= status "finished\n")
+           (progn 
+             (ahg-generic-command ;; if successful, we then try to convert it to
+                                  ;; a regular changeset.
+              "qdelete" (list "--rev" "tip")
+              (lexical-let ((aroot (ahg-root)))
+                (lambda (process status)
+                  (if (string= status "finished\n")
+                      (progn
+                        (ahg-status-maybe-refresh aroot)
+                        (ahg-mq-patches-maybe-refresh aroot)
+                        (kill-buffer (process-buffer process)))
+                    ;; note that if this second command fails, we still have
+                    ;; changed the log message... This is not nice, but at the
+                    ;; moment I don't know how to fix it
+                    (ahg-show-error process)))))
+             (kill-buffer (process-buffer process)))
+         (ahg-show-error process))))))
 
 (defun ahg-mq-convert-patch-to-changeset ()
   "Tell mq to stop managing the current patch and convert it to a regular
