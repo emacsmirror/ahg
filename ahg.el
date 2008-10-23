@@ -88,7 +88,7 @@
         (define-key qmap "p" 'ahg-qpop-all)
         (define-key qmap "t" 'ahg-qtop)
         (define-key qmap "d" 'ahg-qdelete)
-        (define-key qmap "c" 'ahg-mq-convert-patch-to-changeset)
+        (define-key qmap "f" 'ahg-mq-convert-patch-to-changeset)
         (define-key qmap "l" 'ahg-mq-list-patches)
         (define-key qmap "e" 'ahg-mq-edit-series)
         qmap))
@@ -317,7 +317,7 @@ Commands:
     (define-key qmap "p" 'ahg-qpop-all)
     (define-key qmap "t" 'ahg-qtop)
     (define-key qmap "d" 'ahg-qdelete)
-    (define-key qmap "c" 'ahg-mq-convert-patch-to-changeset)
+    (define-key qmap "f" 'ahg-mq-convert-patch-to-changeset)
     (define-key qmap "l" 'ahg-mq-list-patches)
     (define-key qmap "e" 'ahg-mq-edit-series)
     (define-key ahg-status-mode-map "Q" qmap))
@@ -366,7 +366,7 @@ Commands:
      ["List all patches" ahg-mq-list-patches [:keys "Ql" :active t]]
      ["Delete patch..." ahg-qdelete [:keys "Qd" :active t]]
      ["Convert current patch to changeset"
-      ahg-mq-convert-patch-to-changeset [:keys "Qc" :active t]]
+      ahg-mq-convert-patch-to-changeset [:keys "Qf" :active t]]
      ["Edit series file" ahg-mq-edit-series [:keys "Qe" :active t]])
     ["--" nil nil]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
