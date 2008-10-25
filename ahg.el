@@ -714,6 +714,35 @@ ahg-status, and it has an ewoc associated with it."
         (t (message "hg commit: no file found, aborting."))))
 
 ;;-----------------------------------------------------------------------------
+;; hg update
+;;-----------------------------------------------------------------------------
+
+(defvar ahg-update-to-rev-get-revision-function nil)
+
+(defun ahg-update-to-rev (rev force)
+  "Update to the given revision. If force is non-nil, pass -C
+flag to hg update."
+  (interactive
+   (let ((rev (funcall ahg-update-to-rev-get-revision-function)))
+     (list
+      (and rev (ahg-y-or-n-p (format "Update to revision %s? " rev)) rev)
+      (and rev (ahg-uncommitted-changes-p)
+           (ahg-y-or-n-p "Overwrite local changes? ")))))
+  (when rev
+    (ahg-generic-command
+     "update" (if force (list "-C" "-r" rev) (list "-r" rev))
+     (lexical-let ((aroot default-directory)
+                   (rev rev))
+       (lambda (process status)
+         (if (string= status "finished\n")
+             (progn
+               (ahg-status-maybe-refresh aroot)
+               (message "Updated to revision %s" rev)
+               (kill-buffer (process-buffer process)))
+           (ahg-show-error process)))))))
+
+
+;;-----------------------------------------------------------------------------
 ;; hg log
 ;;-----------------------------------------------------------------------------
 
@@ -724,7 +753,7 @@ ahg-status, and it has an ewoc associated with it."
     (define-key map [?=] 'ahg-short-log-view-diff)
     (define-key map [?D] 'ahg-short-log-view-diff-select-rev)
     (define-key map [? ] 'ahg-short-log-view-details)
-    (define-key map [?\r] 'ahg-short-log-view-details)
+    (define-key map [?\r] 'ahg-short-log-update-to-rev)
     (define-key map [?r] 'ahg-short-log-goto-revision)
     (define-key map [?n] 'ahg-short-log-next)
     (define-key map [?p] 'ahg-short-log-previous)
@@ -764,6 +793,7 @@ Commands:
     ["View Revision Diff with Other..." ahg-short-log-view-diff-select-rev
      [:keys "D" :active t]]
     ["View Revision Details" ahg-short-log-view-details [:keys " " :active t]]
+    ["Update to Revision" ahg-short-log-update-to-rev [:keys "\r" :active t]]
     ["--" nil nil]
     ["Status" ahg-status [:keys "s" :active t]]
     ["Hg Command" ahg-do-command [:keys "!" :active t]]
@@ -875,6 +905,13 @@ do nothing."
     (while (and n (not (string= rev (car (ewoc-data n)))))
       (setq n (ewoc-next ewoc n)))
     (when n (ewoc-goto-node ewoc n))))
+
+
+(defun ahg-short-log-update-to-rev ()
+  (interactive)
+  (let ((ahg-update-to-rev-get-revision-function
+         'ahg-short-log-revision-at-point))
+    (call-interactively 'ahg-update-to-rev)))
 
 
 (defun ahg-args-add-revs (r1 r2 &optional disjoint)
@@ -1014,6 +1051,7 @@ Commands:
   (define-key ahg-log-mode-map [?q] 'ahg-buffer-quit)
   (define-key ahg-log-mode-map [?!] 'ahg-do-command)
   (define-key ahg-log-mode-map [?h] 'ahg-command-help)
+  (define-key ahg-log-mode-map "\r" 'ahg-log-update-to-rev)
   (set (make-local-variable 'font-lock-defaults)
        (list 'ahg-log-font-lock-keywords t nil nil))
   (easy-menu-add ahg-log-mode-menu ahg-log-mode-map))
@@ -1023,6 +1061,7 @@ Commands:
     ["View Revision Diff" ahg-log-view-diff [:keys "=" :active t]]
     ["View Revision Diff with Other..." ahg-log-view-diff-select-rev
      [:keys "D" :active t]]
+    ["Update to Revision" ahg-log-update-to-rev [:keys "\r" :active t]]
     ["--" nil nil]
     ["Status" ahg-status [:keys "s" :active t]]
     ["Hg Command" ahg-do-command [:keys "!" :active t]]
@@ -1137,6 +1176,11 @@ prompts also for extra flags."
                       (ahg-log-read-args nil (equal current-prefix-arg '(16))))
              (ahg-log "tip" "0"))))
         (t (message "hg log: no file found, aborting."))))
+
+(defun ahg-log-update-to-rev ()
+  (interactive)
+  (let ((ahg-update-to-rev-get-revision-function 'ahg-log-revision-at-point))
+    (call-interactively 'ahg-update-to-rev)))
 
 ;;-----------------------------------------------------------------------------
 ;; hg diff
