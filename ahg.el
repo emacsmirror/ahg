@@ -133,6 +133,10 @@ operations (e.g. add, remove, commit) are performed."
   "If non-nil, use short form (y or n) when asking for confimation to the user."
   :group 'ahg :type 'boolean)
 
+(defcustom ahg-log-default-revisions (cons "tip" "0")
+  "Default revision arguments for `ahg-log' and `ahg-short-log'."
+  :group 'ahg :type '(cons string string))
+
 (defface ahg-status-marked-face
   '((default (:inherit font-lock-preprocessor-face)))
   "Face for marked files in aHg status buffers." :group 'ahg)
@@ -718,7 +722,7 @@ ahg-status, and it has an ewoc associated with it."
     (define-key map [?g] 'ahg-short-log)
     (define-key map [?s] 'ahg-status)
     (define-key map [?=] 'ahg-short-log-view-diff)
-    (define-key map [?D] 'ahg-short-log-view-diff-with-other)
+    (define-key map [?D] 'ahg-short-log-view-diff-select-rev)
     (define-key map [? ] 'ahg-short-log-view-details)
     (define-key map [?\r] 'ahg-short-log-view-details)
     (define-key map [?r] 'ahg-short-log-goto-revision)
@@ -901,11 +905,11 @@ do nothing."
    (list (read-string
           (concat "hg log"
                   (if is-on-selected-files " (on selected files)" "")
-                  ", R1: ") "tip")
+                  ", R1: ") (car ahg-log-default-revisions))
          (read-string
            (concat "hg log"
                    (if is-on-selected-files " (on selected files)" "")
-                   ", R2: ") "0"))
+                   ", R2: ") (cdr ahg-log-default-revisions)))
     (when read-extra-flags
       (list (read-string
              (concat "hg log"
