@@ -1630,6 +1630,11 @@ last refresh."
     (define-key map [?p] 'ahg-qpop-all)
     (define-key map [?n] 'ahg-qnew)
     (define-key map [?e] 'ahg-mq-edit-series)
+    (define-key map [?Q]
+      (let ((submap (make-sparse-keymap)))
+        (define-key submap [?f] 'ahg-mq-patches-convert-patch-to-changeset)
+        (define-key submap [?r] 'ahg-mq-patches-qrefresh)
+        submap))
     map)
   "Keymap used in `ahg-mq-patches-mode'.")
 
@@ -1648,6 +1653,10 @@ last refresh."
     ["Delete Patch" ahg-mq-patches-delete-patch [:keys "D" :active t]]
     ["Pop All Patches" ahg-qpop-all [:keys "p" :active t]]
     ["Edit series file" ahg-mq-edit-series [:keys "e" :active t]]
+    ["--" nil nil]
+    ["Refresh Current Patch" ahg-mq-patches-qrefresh [:keys "Qr" :active t]]
+    ["Convert current patch to changeset"
+     ahg-mq-patches-convert-patch-to-changeset [:keys "Qf" :active t]]
     ["--" nil nil]
     ["Hg Command" ahg-do-command [:keys "!" :active t]]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
@@ -1863,6 +1872,30 @@ stack of applied patches."
          (ok (and patch (ahg-y-or-n-p (format "Delete patch %s? " patch)))))
     (when ok
       (ahg-qdelete patch))))
+
+
+(defun ahg-mq-get-current-patch ()
+  (with-temp-buffer
+    (when (= (call-process "hg" nil t nil "qtop") 0)
+      (buffer-substring-no-properties (point-min) (1- (point-max))))))
+
+(defun ahg-mq-patches-qrefresh (get-log-message)
+  (interactive "P")
+  (let ((curpatch (ahg-mq-get-current-patch)))
+    (if curpatch
+        (and (ahg-y-or-n-p (format "Refresh current patch (%s)? " curpatch))
+             (ahg-qrefresh get-log-message))
+      (message "aHg Error: unable to determine current patch!"))))
+
+
+(defun ahg-mq-patches-convert-patch-to-changeset ()
+  (interactive)
+  (let ((curpatch (ahg-mq-get-current-patch)))
+    (if curpatch
+        (and (ahg-y-or-n-p (format "Convert current patch (%s) to changeset? "
+                                   curpatch))
+             (ahg-mq-convert-patch-to-changeset))
+      (message "aHg Error: unable to determine current patch!"))))
 
 ;;-----------------------------------------------------------------------------
 ;; Various helper functions
