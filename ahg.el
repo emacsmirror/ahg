@@ -133,10 +133,6 @@ operations (e.g. add, remove, commit) are performed."
   "If non-nil, use short form (y or n) when asking for confimation to the user."
   :group 'ahg :type 'boolean)
 
-(defcustom ahg-log-default-revisions (cons "tip" "0")
-  "Default revision arguments for `ahg-log' and `ahg-short-log'."
-  :group 'ahg :type '(cons string string))
-
 (defface ahg-status-marked-face
   '((default (:inherit font-lock-preprocessor-face)))
   "Face for marked files in aHg status buffers." :group 'ahg)
@@ -937,21 +933,26 @@ do nothing."
 
 ;; helper function used by ahg-short-log, ahg-log and ahg-log-cur-file to
 ;; get arguments from the user
+(defvar ahg-log-default-revisions '("tip" . "0"))
 (defun ahg-log-read-args (is-on-selected-files read-extra-flags)
-  (append
-   (list (read-string
-          (concat "hg log"
-                  (if is-on-selected-files " (on selected files)" "")
-                  ", R1: ") (car ahg-log-default-revisions))
-         (read-string
-           (concat "hg log"
-                   (if is-on-selected-files " (on selected files)" "")
-                   ", R2: ") (cdr ahg-log-default-revisions)))
-    (when read-extra-flags
-      (list (read-string
-             (concat "hg log"
-                     (if is-on-selected-files " (on selected files)" "")
-                     ", extra switches: ") "")))))
+  (let ((retval
+         (append
+          (list (read-string
+                 (concat "hg log"
+                         (if is-on-selected-files " (on selected files)" "")
+                         ", R1: ") (car ahg-log-default-revisions))
+                (read-string
+                 (concat "hg log"
+                         (if is-on-selected-files " (on selected files)" "")
+                         ", R2: ") (cdr ahg-log-default-revisions)))
+          (when read-extra-flags
+            (list (read-string
+                   (concat "hg log"
+                           (if is-on-selected-files " (on selected files)" "")
+                           ", extra switches: ") ""))))))
+    ;; remember the values entered for the next call
+    (setq ahg-log-default-revisions (cons (car retval) (cadr retval)))
+    retval))
 
 
 (defun ahg-short-log-create-ewoc ()
