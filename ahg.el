@@ -29,6 +29,72 @@
 (require 'cl)
 
 ;;-----------------------------------------------------------------------------
+;; ahg-version
+;;-----------------------------------------------------------------------------
+
+(defvar ahg-version-string "0.99")
+
+(defun ahg-version ()
+  "Shows aHg version number."
+  (interactive)
+  (message "aHg version %s" ahg-version-string))
+
+;;-----------------------------------------------------------------------------
+;; the global aHg menu and keymap
+;;-----------------------------------------------------------------------------
+
+(easy-menu-add-item nil '("tools")
+                    '("aHg"
+                      ["Status" ahg-status t]
+                      ["Log Summary" ahg-short-log t]
+                      ["Detailed Log" ahg-log t]
+                      ["Commit Current File" ahg-commit-cur-file t]
+                      ["View Changes of Current File" ahg-diff-cur-file t]
+                      ["View Change Log of Current File" ahg-log-cur-file t]
+                      ["--" nil nil]
+                      ("Mercurial Queues"
+                       ["New Patch" ahg-qnew t]
+                       ["View Qdiff" ahg-qdiff t]
+                       ["Refresh Current Patch" ahg-qrefresh t]
+                       ["Go to Patch..." ahg-qgoto t]
+                       ["Pop All Patches" ahg-qpop-all t]
+                       ["Show Name of Current Patch" ahg-qtop t]
+                       ["List All Patches" ahg-mq-list-patches t]
+                       ["Delete Patch..." ahg-qdelete t]
+                       ["Convert Current Patch to Changeset"
+                        ahg-mq-convert-patch-to-changeset t]
+                       ["Edit series File" ahg-mq-edit-series t])
+                      ["--" nil nil]
+                      ["Execute Hg Command" ahg-do-command t]
+                      ["Help on Hg Command" ahg-command-help t])
+                    "PCL-CVS")
+
+(defvar ahg-global-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "s" 'ahg-status)
+    (define-key map "l" 'ahg-short-log)
+    (define-key map "L" 'ahg-log)
+    (define-key map "!" 'ahg-do-command)
+    (define-key map "h" 'ahg-command-help)
+    (define-key map "c" 'ahg-commit-cur-file)
+    (define-key map "=" 'ahg-diff-cur-file)
+    (define-key map (kbd "C-l") 'ahg-log-cur-file)
+    (define-key map "Q"
+      (let ((qmap (make-sparse-keymap)))
+        (define-key qmap "n" 'ahg-qnew)
+        (define-key qmap "=" 'ahg-qdiff)
+        (define-key qmap "r" 'ahg-qrefresh)
+        (define-key qmap "g" 'ahg-qgoto)
+        (define-key qmap "p" 'ahg-qpop-all)
+        (define-key qmap "t" 'ahg-qtop)
+        (define-key qmap "d" 'ahg-qdelete)
+        (define-key qmap "f" 'ahg-mq-convert-patch-to-changeset)
+        (define-key qmap "l" 'ahg-mq-list-patches)
+        (define-key qmap "e" 'ahg-mq-edit-series)
+        qmap))
+    map))
+
+;;-----------------------------------------------------------------------------
 ;; Customization
 ;;-----------------------------------------------------------------------------
 
@@ -151,72 +217,6 @@ operations (e.g. add, remove, commit) are performed."
 (defvar ahg-short-log-user-face 'ahg-short-log-user-face)
 (defvar ahg-header-line-face 'ahg-header-line-face)
 (defvar ahg-header-line-root-face 'ahg-header-line-root-face)
-
-;;-----------------------------------------------------------------------------
-;; ahg-version
-;;-----------------------------------------------------------------------------
-
-(defvar ahg-version-string "0.99")
-
-(defun ahg-version ()
-  "Shows aHg version number."
-  (interactive)
-  (message "aHg version %s" ahg-version-string))
-
-;;-----------------------------------------------------------------------------
-;; the global aHg menu and keymap
-;;-----------------------------------------------------------------------------
-
-(easy-menu-add-item nil '("tools")
-                    '("aHg"
-                      ["Status" ahg-status t]
-                      ["Log Summary" ahg-short-log t]
-                      ["Detailed Log" ahg-log t]
-                      ["Commit Current File" ahg-commit-cur-file t]
-                      ["View Changes of Current File" ahg-diff-cur-file t]
-                      ["View Change Log of Current File" ahg-log-cur-file t]
-                      ["--" nil nil]
-                      ("Mercurial Queues"
-                       ["New Patch" ahg-qnew t]
-                       ["View Qdiff" ahg-qdiff t]
-                       ["Refresh Current Patch" ahg-qrefresh t]
-                       ["Go to Patch..." ahg-qgoto t]
-                       ["Pop All Patches" ahg-qpop-all t]
-                       ["Show Name of Current Patch" ahg-qtop t]
-                       ["List All Patches" ahg-mq-list-patches t]
-                       ["Delete Patch..." ahg-qdelete t]
-                       ["Convert Current Patch to Changeset"
-                        ahg-mq-convert-patch-to-changeset t]
-                       ["Edit series File" ahg-mq-edit-series t])
-                      ["--" nil nil]
-                      ["Execute Hg Command" ahg-do-command t]
-                      ["Help on Hg Command" ahg-command-help t])
-                    "PCL-CVS")
-
-(defvar ahg-global-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map "s" 'ahg-status)
-    (define-key map "l" 'ahg-short-log)
-    (define-key map "L" 'ahg-log)
-    (define-key map "!" 'ahg-do-command)
-    (define-key map "h" 'ahg-command-help)
-    (define-key map "c" 'ahg-commit-cur-file)
-    (define-key map "=" 'ahg-diff-cur-file)
-    (define-key map (kbd "C-l") 'ahg-log-cur-file)
-    (define-key map "Q"
-      (let ((qmap (make-sparse-keymap)))
-        (define-key qmap "n" 'ahg-qnew)
-        (define-key qmap "=" 'ahg-qdiff)
-        (define-key qmap "r" 'ahg-qrefresh)
-        (define-key qmap "g" 'ahg-qgoto)
-        (define-key qmap "p" 'ahg-qpop-all)
-        (define-key qmap "t" 'ahg-qtop)
-        (define-key qmap "d" 'ahg-qdelete)
-        (define-key qmap "f" 'ahg-mq-convert-patch-to-changeset)
-        (define-key qmap "l" 'ahg-mq-list-patches)
-        (define-key qmap "e" 'ahg-mq-edit-series)
-        qmap))
-    map))
 
 ;;-----------------------------------------------------------------------------
 ;; hg root
