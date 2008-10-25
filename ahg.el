@@ -583,7 +583,7 @@ the file on the current line."
 (defun ahg-get-status-ewoc (root)
   "Returns an *hg status* buffer for ROOT. The buffer's major mode is
 ahg-status, and it has an ewoc associated with it."
-  (let ((buf (get-buffer-create (concat "*hg status: " root "*")))
+  (let ((buf (ahg-get-status-buffer root t))
         (inhibit-read-only t)
         (header (concat
                  (propertize "hg status for " 'face ahg-header-line-face)
@@ -600,9 +600,11 @@ ahg-status, and it has an ewoc associated with it."
         (setq default-directory (file-name-as-directory root))
         ew))))
 
-(defun ahg-get-status-buffer (&optional root)
+(defun ahg-get-status-buffer (&optional root create)
   (unless root (setq root (ahg-root)))
-  (get-buffer (concat "*hg status: " root "*")))
+  (let ((name (concat "*hg status: "
+                      (file-name-as-directory (expand-file-name root)) "*")))
+    (funcall (if create 'get-buffer-create 'get-buffer) name)))
 
 (defvar ahg-status-no-pop nil)
 
