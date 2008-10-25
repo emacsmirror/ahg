@@ -283,7 +283,6 @@ Commands:
   (buffer-disable-undo) ;; undo info not needed here
   (toggle-read-only t)
   (font-lock-mode nil)
-;;  (define-key ahg-status-mode-map (kbd "C-h") 'describe-mode)
   (define-key ahg-status-mode-map " " 'ahg-status-toggle-mark)
   (define-key ahg-status-mode-map "m" 'ahg-status-mark)
   (define-key ahg-status-mode-map "u" 'ahg-status-unmark)
@@ -718,7 +717,6 @@ ahg-status, and it has an ewoc associated with it."
 
 (defvar ahg-short-log-mode-map
   (let ((map (make-sparse-keymap)))
-;;    (define-key map (kbd "C-h") 'describe-mode)
     (define-key map [?g] 'ahg-short-log)
     (define-key map [?s] 'ahg-status)
     (define-key map [?=] 'ahg-short-log-view-diff)
@@ -1004,7 +1002,6 @@ Commands:
 "
   (buffer-disable-undo) ;; undo info not needed here
   (toggle-read-only t)
-;;  (define-key ahg-log-mode-map (kbd "C-h") 'describe-mode)
   (define-key ahg-log-mode-map [?g] 'ahg-log)
   (define-key ahg-log-mode-map [?s] 'ahg-status)
   (define-key ahg-log-mode-map [?=] 'ahg-log-view-diff)
