@@ -1678,8 +1678,8 @@ last refresh."
     (define-key map [?p] 'ahg-qpop-all)
     (define-key map [?n] 'ahg-qnew)
     (define-key map [?e] 'ahg-mq-edit-series)
-    (define-key submap [?f] 'ahg-mq-patches-convert-patch-to-changeset)
-    (define-key submap [?r] 'ahg-mq-patches-qrefresh)
+    (define-key map [?f] 'ahg-mq-patches-convert-patch-to-changeset)
+    (define-key map [?r] 'ahg-mq-patches-qrefresh)
     map)
   "Keymap used in `ahg-mq-patches-mode'.")
 
