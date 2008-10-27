@@ -1678,11 +1678,8 @@ last refresh."
     (define-key map [?p] 'ahg-qpop-all)
     (define-key map [?n] 'ahg-qnew)
     (define-key map [?e] 'ahg-mq-edit-series)
-    (define-key map [?Q]
-      (let ((submap (make-sparse-keymap)))
-        (define-key submap [?f] 'ahg-mq-patches-convert-patch-to-changeset)
-        (define-key submap [?r] 'ahg-mq-patches-qrefresh)
-        submap))
+    (define-key submap [?f] 'ahg-mq-patches-convert-patch-to-changeset)
+    (define-key submap [?r] 'ahg-mq-patches-qrefresh)
     map)
   "Keymap used in `ahg-mq-patches-mode'.")
 
@@ -1702,9 +1699,9 @@ last refresh."
     ["Pop All Patches" ahg-qpop-all [:keys "p" :active t]]
     ["Edit series File" ahg-mq-edit-series [:keys "e" :active t]]
     ["--" nil nil]
-    ["Refresh Current Patch" ahg-mq-patches-qrefresh [:keys "Qr" :active t]]
+    ["Refresh Current Patch" ahg-mq-patches-qrefresh [:keys "r" :active t]]
     ["Convert Current Patch to Changeset"
-     ahg-mq-patches-convert-patch-to-changeset [:keys "Qf" :active t]]
+     ahg-mq-patches-convert-patch-to-changeset [:keys "f" :active t]]
     ["--" nil nil]
     ["Hg Command" ahg-do-command [:keys "!" :active t]]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
