@@ -1229,13 +1229,16 @@ Commands:
                              (ahg-show-error process)))
                          buffer)))
 
-(defun ahg-diff-cur-file ()
-  (interactive)
+(defun ahg-diff-cur-file (ask-other-rev)
+  (interactive "P")
   (cond ((eq major-mode 'ahg-status-mode) (call-interactively 'ahg-status-diff))
         ((eq major-mode 'ahg-short-log-mode)
          (call-interactively 'ahg-short-log-view-diff))
         ((eq major-mode 'ahg-log-mode) (call-interactively 'ahg-log-view-diff))
-        ((buffer-file-name) (ahg-diff nil nil (list (buffer-file-name))))
+        ((buffer-file-name)
+         (ahg-diff (when ask-other-rev
+                     (read-string "Enter revision to compare against: "))
+                   nil (list (buffer-file-name))))
         (t (message "hg diff: no file found, aborting."))))
 
 ;;-----------------------------------------------------------------------------
