@@ -719,11 +719,11 @@ ahg-status, and it has an ewoc associated with it."
   "Update to the given revision. If force is non-nil, pass -C
 flag to hg update."
   (interactive
-   (let ((rev (funcall ahg-update-to-rev-get-revision-function)))
-     (list
-      (and rev (ahg-y-or-n-p (format "Update to revision %s? " rev)) rev)
-      (and rev (ahg-uncommitted-changes-p)
-           (ahg-y-or-n-p "Overwrite local changes? ")))))
+   (let* ((rev (funcall ahg-update-to-rev-get-revision-function))
+          (ans (and rev (ahg-y-or-n-p (format "Update to revision %s? " rev))))
+          (overw (and ans (ahg-uncommitted-changes-p)
+                      (ahg-y-or-n-p "Overwrite local changes? "))))
+     (list (and ans rev) overw)))
   (when rev
     (ahg-generic-command
      "update" (if force (list "-C" "-r" rev) (list "-r" rev))
