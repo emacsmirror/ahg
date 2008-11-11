@@ -1411,8 +1411,7 @@ selected files will be incorporated into the patch."
          (and (ahg-uncommitted-changes-p)
               (ahg-y-or-n-p "Import outstanding changes into patch? "))
          current-prefix-arg))
-  (let ((buf (generate-new-buffer "*aHg-log*"))
-        (files (when (eq major-mode 'ahg-status-mode)
+  (let ((files (when (eq major-mode 'ahg-status-mode)
                  (mapcar 'cddr (ahg-status-get-marked nil)))))
     (if edit-log-message
         (ahg-log-edit
@@ -1420,7 +1419,7 @@ selected files will be incorporated into the patch."
            (lambda () (interactive)
              (ahg-mq-log-callback "qnew" (when force (list "-f")))))
          (lexical-let ((flist (cons patchname files))) (lambda () flist))
-         buf)
+         (generate-new-buffer "*aHg-log*"))
       ;; else
       (ahg-generic-command
        "qnew" (append (when force (list "-f")) (list patchname) files)
