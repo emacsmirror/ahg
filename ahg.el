@@ -1937,7 +1937,7 @@ stack of applied patches."
 
 (defun ahg-mq-patches-convert-patch-to-changeset ()
   (interactive)
-  (let ((curpatch (ahg-mq-patches-patch-at-point)))
+  (let ((curpatch (ahg-mq-get-current-patch)))
     (if curpatch
         (and (ahg-y-or-n-p (format "Convert current patch (%s) to changeset? "
                                    curpatch))
