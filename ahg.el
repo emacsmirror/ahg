@@ -1184,6 +1184,152 @@ prompts also for extra flags."
     (call-interactively 'ahg-update-to-rev)))
 
 ;;-----------------------------------------------------------------------------
+;; graph log
+;;-----------------------------------------------------------------------------
+
+(defvar ahg-glog-font-lock-keywords
+  '(("^hg revision DAG for" . ahg-header-line-face)
+    ("^hg revision DAG for \\(.*\\)" 1 ahg-header-line-root-face)
+    ("^\\([+|@o\\\\/ -]\\)+" . 'bold)
+    ("^\\([+|@o\\\\/ -]\\)+\\([0-9]+\\)" 2 ahg-short-log-revision-face)
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  \\([0-9a-f]+\\)" 2 ahg-log-revision-face)
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  \\([^ ]+\\)"
+     2 ahg-short-log-date-face)
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  \\([^ ]+\\)" 2
+     ahg-short-log-user-face)
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  \\(.+\\)$" 2
+     ahg-log-branch-face)
+    )
+  "Keywords in `ahg-glog-mode' mode.")
+
+(define-derived-mode ahg-glog-mode nil "ahg-glog"
+  "Major mode to display hg glog output.
+
+Commands:
+\\{ahg-glog-mode-map}
+"
+  (buffer-disable-undo) ;; undo info not needed here
+        (setq truncate-lines t)
+  (toggle-read-only t)
+  (define-key ahg-glog-mode-map [?g] 'ahg-glog)
+  (define-key ahg-glog-mode-map [?s] 'ahg-status)
+  (define-key ahg-glog-mode-map [?=] 'ahg-glog-view-diff)
+  (define-key ahg-glog-mode-map [?D] 'ahg-glog-view-diff-select-rev)
+  (define-key ahg-glog-mode-map [?n] 'ahg-glog-next)
+  (define-key ahg-glog-mode-map "\t" 'ahg-glog-next)
+  (define-key ahg-glog-mode-map [?p] 'ahg-glog-previous)
+  (define-key ahg-glog-mode-map [?q] 'ahg-buffer-quit)
+  (define-key ahg-glog-mode-map [?!] 'ahg-do-command)
+  (define-key ahg-glog-mode-map [?h] 'ahg-command-help)
+  (define-key ahg-glog-mode-map "\r" 'ahg-glog-update-to-rev)
+  (define-key ahg-glog-mode-map [? ] 'ahg-glog-view-details)
+  (set (make-local-variable 'font-lock-defaults)
+       (list 'ahg-glog-font-lock-keywords t nil nil))
+  (easy-menu-add ahg-glog-mode-menu ahg-glog-mode-map))
+
+(easy-menu-define ahg-glog-mode-menu ahg-glog-mode-map "aHg Glog"
+  '("aHg Glog"
+    ["View Revision Details" ahg-glog-view-details [:keys " " :active t]]
+    ["View Revision Diff" ahg-glog-view-diff [:keys "=" :active t]]
+    ["View Revision Diff with Other..." ahg-glog-view-diff-select-rev
+     [:keys "D" :active t]]
+    ["Update to Revision" ahg-glog-update-to-rev [:keys "\r" :active t]]
+    ["--" nil nil]
+    ["Status" ahg-status [:keys "s" :active t]]
+    ["Hg Command" ahg-do-command [:keys "!" :active t]]
+    ["--" nil nil]
+    ["Next Revision" ahg-glog-next [:keys "\t" :active t]]
+    ["Previous Revision" ahg-glog-previous [:keys "p" :active t]]
+    ["--" nil nil]
+    ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
+    ["--" nil nil]
+    ["Refresh" ahg-glog [:keys "g" :active t]]
+    ["Quit" ahg-buffer-quit [:keys "q" :active t]]
+    ))
+
+
+(defconst ahg-glog-start-regexp "^\\([+|@o\\\\/ -]\\)+\\([0-9]+\\)")
+
+(defun ahg-glog-next (n)
+  (interactive "p")
+  (end-of-line)
+  (re-search-forward ahg-glog-start-regexp nil t n)
+  (beginning-of-line))
+
+(defun ahg-glog-previous (n)
+  (interactive "p")
+  (end-of-line)
+  (re-search-backward ahg-glog-start-regexp)
+  (re-search-backward ahg-glog-start-regexp nil t n))
+
+(defun ahg-glog-view-diff ()
+  (interactive)
+  (let* ((r1 (ahg-glog-revision-at-point))
+         (r2 (ahg-first-parent-of-rev r1)))
+    (ahg-diff r2 r1)))
+
+(defun ahg-glog-view-diff-select-rev (rev)
+  (interactive "sEnter revision to compare against: ")
+  (let ((r1 (ahg-glog-revision-at-point))
+        (r2 rev))
+    (ahg-diff r2 r1)))
+
+(defun ahg-glog-revision-at-point ()
+  (save-excursion
+    (end-of-line)
+    (re-search-backward ahg-glog-start-regexp)
+    (match-string-no-properties 2)))
+
+(defun ahg-glog-view-details ()
+  "View details of the given revision."
+  (interactive)
+  (let ((rev (ahg-glog-revision-at-point)))
+    (ahg-log rev nil)))
+  
+(defun ahg-glog (r1 r2 &optional extra-flags)
+  "Run hg glog. R1 and R2 specify the range of revisions to
+consider. When run interactively, the user must enter their
+values (which default to tip for R1 and 0 for R2). If called with
+a prefix argument, prompts also for EXTRA-FLAGS."
+  (interactive
+   (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))
+  (let ((buffer (get-buffer-create
+                 (concat "*hg glog: " (ahg-root) "*")))
+        (command-list (ahg-args-add-revs r1 r2)))  
+    (setq command-list
+          (append command-list
+                  (list "--template"
+                        "{rev}  {node|short}  {date|shortdate}  {author|user}  [{tags}]\\n  {desc|firstline}\\n\\n")
+                  (when extra-flags (split-string extra-flags))))
+    (when ahg-file-list-for-log-command
+      (setq command-list (append command-list ahg-file-list-for-log-command)))
+    (with-current-buffer buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (ahg-push-window-configuration)))
+    (ahg-generic-command
+     "glog" command-list
+     (lexical-let ((dn (or ahg-dir-name-for-log-command default-directory)))
+       (lambda (process status)
+         (if (string= status "finished\n")
+             (progn
+               (pop-to-buffer (process-buffer process))
+               (ahg-glog-mode)
+               (beginning-of-buffer)
+               (let ((inhibit-read-only t))
+                 (insert
+                  (propertize "hg revision DAG for " 'face ahg-header-line-face)
+                  (propertize dn 'face ahg-header-line-root-face)
+                  "\n\n")))
+           (ahg-show-error process))))
+     buffer)))
+
+(defun ahg-glog-update-to-rev ()
+  (interactive)
+  (let ((ahg-update-to-rev-get-revision-function 'ahg-glog-revision-at-point))
+    (call-interactively 'ahg-update-to-rev)))
+
+;;-----------------------------------------------------------------------------
 ;; hg diff
 ;;-----------------------------------------------------------------------------
 
