@@ -341,7 +341,7 @@ Commands:
     ["Unmark" ahg-status-unmark [:keys "u" :active t]]
     ["Unmark All" ahg-status-unmark-all [:keys (kbd "M-DEL") :active t]]
     ["--" nil nil]
-    ["Short Log" ahg-short-log [:keys "l" :active t]]
+    ["Log Summary" ahg-short-log [:keys "l" :active t]]
     ["Detailed Log" ahg-log [:keys "L" :active t]]
     ["Revision DAG" ahg-glog [:keys "G" :active t]]
     ["Diff" ahg-status-diff [:keys "=" :active t]]
