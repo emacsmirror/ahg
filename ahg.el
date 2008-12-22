@@ -48,6 +48,7 @@
                       ["Status" ahg-status t]
                       ["Log Summary" ahg-short-log t]
                       ["Detailed Log" ahg-log t]
+                      ["Revision DAG" ahg-glog t]
                       ["Commit Current File" ahg-commit-cur-file t]
                       ["View Changes of Current File" ahg-diff-cur-file t]
                       ["View Change Log of Current File" ahg-log-cur-file t]
@@ -74,6 +75,7 @@
     (define-key map "s" 'ahg-status)
     (define-key map "l" 'ahg-short-log)
     (define-key map "L" 'ahg-log)
+    (define-key map "G" 'ahg-glog)
     (define-key map "!" 'ahg-do-command)
     (define-key map "h" 'ahg-command-help)
     (define-key map "c" 'ahg-commit-cur-file)
@@ -341,6 +343,7 @@ Commands:
     ["--" nil nil]
     ["Short Log" ahg-short-log [:keys "l" :active t]]
     ["Detailed Log" ahg-log [:keys "L" :active t]]
+    ["Revision DAG" ahg-glog [:keys "G" :active t]]
     ["Diff" ahg-status-diff [:keys "=" :active t]]
     ["Diff Marked" ahg-status-diff-all [:keys "D" :active t]]
     ["--" nil nil]
