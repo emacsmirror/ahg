@@ -102,6 +102,10 @@
 
 (defgroup ahg nil "aHg Mercurial Frontend" :group 'tools)
 
+(defcustom ahg-hg-command "hg"
+  "Command to use for invoking Mercurial."
+  :group 'ahg :type 'string)
+
 (defcustom ahg-global-key-prefix "hg"
   "Prefix of globally-available aHg commands."
   :group 'ahg :type 'string
@@ -228,7 +232,7 @@ operations (e.g. add, remove, commit) are performed."
   "Returns the root of the tree handled by Mercurial, or nil if
 the current dir is not under hg."
   (with-temp-buffer
-    (when (= (call-process "hg" nil t nil "root") 0)
+    (when (= (call-process ahg-hg-command nil t nil "root") 0)
       (buffer-substring-no-properties (point-min) (1- (point-max))))))
 
 ;;-----------------------------------------------------------------------------
@@ -241,8 +245,8 @@ the current dir is not under hg."
     (let ((status
            (if root
                (let ((default-directory (file-name-as-directory root)))
-                 (call-process "hg" nil t nil "identify"))
-             (call-process "hg" nil t nil "identify"))))
+                 (call-process ahg-hg-command nil t nil "identify"))
+             (call-process ahg-hg-command nil t nil "identify"))))
       (when (= status 0)
         (buffer-substring-no-properties (point-min) (1- (point-max)))))))
 
@@ -1399,7 +1403,7 @@ Commands:
 (defun ahg-complete-command-name (command)
   (with-temp-buffer
     (let ((process-environment (cons "LANG=" process-environment)))
-      (if (= (call-process "hg" nil t nil "commands") 0)
+      (if (= (call-process ahg-hg-command nil t nil "commands") 0)
           ;; first, we check whether the 'commands' extension is installed
           (let (out)
             (beginning-of-buffer)
@@ -1412,7 +1416,7 @@ Commands:
               (forward-line 1))
             (if out (nreverse out) (list command)))
         ;; otherwise, we fall back to calling 'hg help'
-        (if (= (call-process "hg" nil t nil "help") 0)
+        (if (= (call-process ahg-hg-command nil t nil "help") 0)
             (let (out)
               (beginning-of-buffer)
               (search-forward "list of commands:")
@@ -1546,7 +1550,7 @@ Commands:
 hg qseries command."
   (with-temp-buffer
     (let ((process-environment (cons "LANG=" process-environment))) 
-      (if (= (call-process "hg" nil t nil "qseries") 0)
+      (if (= (call-process ahg-hg-command nil t nil "qseries") 0)
           (let (out)
             (beginning-of-buffer)
             (while (not (or (looking-at "^$") (eobp)))
@@ -1611,7 +1615,7 @@ only the selected files will be refreshed."
     (if get-log-message
         (let* ((patchname
                 (with-temp-buffer
-                  (when (= (call-process "hg" nil t nil "qtop") 0)
+                  (when (= (call-process ahg-hg-command nil t nil "qtop") 0)
                     (buffer-substring-no-properties
                      (point-min) (1- (point-max))))))
                (msg (when patchname
@@ -1763,7 +1767,7 @@ Pops a buffer for entering the commit message."
   (let* ((buf (generate-new-buffer "*aHg-log*"))
          (patchname
           (with-temp-buffer
-            (when (= (call-process "hg" nil t nil "qtop") 0)
+            (when (= (call-process ahg-hg-command nil t nil "qtop") 0)
               (buffer-substring-no-properties
                (point-min) (1- (point-max))))))
          (msg (when patchname
@@ -1807,7 +1811,8 @@ last refresh."
   ;; whethe (s)he wants to pop all patches before editing series
   (let* ((some-patches-applied
          (with-temp-buffer
-           (when (= (call-process "hg" nil t nil "tip" "--template" "{tags}") 0)
+           (when (= (call-process ahg-hg-command nil t nil "tip"
+                                  "--template" "{tags}") 0)
              (let ((tags (split-string (buffer-string))))
                (member "qtip" tags)))))
          (pop (and some-patches-applied
@@ -2087,7 +2092,7 @@ stack of applied patches."
 
 (defun ahg-mq-get-current-patch ()
   (with-temp-buffer
-    (when (= (call-process "hg" nil t nil "qtop") 0)
+    (when (= (call-process ahg-hg-command nil t nil "qtop") 0)
       (buffer-substring-no-properties (point-min) (1- (point-max))))))
 
 (defun ahg-mq-patches-qrefresh (get-log-message)
@@ -2115,7 +2120,7 @@ stack of applied patches."
 (defun ahg-first-parent-of-rev (rev)
   (with-temp-buffer
     (let ((process-environment (cons "LANG=" process-environment)))
-      (if (= (call-process "hg" nil t nil "parents"
+      (if (= (call-process ahg-hg-command nil t nil "parents"
                            "-r" rev "--template" "{rev}") 0)
           (buffer-string)
         (if (string-to-number rev)
@@ -2140,7 +2145,7 @@ destination buffer. If nil, a new buffer will be used."
   (let ((process
          (apply (if use-shell 'start-process-shell-command 'start-process)
                 (concat "*ahg-command-" command "*") buffer
-                "hg" command args)))
+                ahg-hg-command command args)))
     (set-process-sentinel process
                           (lexical-let ((sf sentinel)
                                         (cmd command))
@@ -2198,8 +2203,8 @@ Commands:
 
 (defun ahg-uncommitted-changes-p (&optional root)
   (with-temp-buffer
-    (let ((args (if root (list "hg" nil t nil "-R" root "id" "-n")
-                  (list "hg" nil t nil "id" "-n"))))
+    (let ((args (if root (list ahg-hg-command nil t nil "-R" root "id" "-n")
+                  (list ahg-hg-command nil t nil "id" "-n"))))
       (when (= (apply 'call-process args) 0)
         (= (char-before (1- (point-max))) ?+)))))
 
@@ -2211,12 +2216,13 @@ Commands:
   (end-of-buffer)
   (let ((user
          (with-temp-buffer
-           (if (= (call-process "hg" nil t nil "showconfig" "ui.username") 0)
+           (if (= (call-process ahg-hg-command nil t nil "showconfig"
+                                "ui.username") 0)
                (buffer-substring-no-properties (point-min) (1- (point-max)))
              "")))
         (branch
          (with-temp-buffer
-           (if (= (call-process "hg" nil t nil "branch") 0)
+           (if (= (call-process ahg-hg-command nil t nil "branch") 0)
                (buffer-substring-no-properties (point-min) (1- (point-max)))
              "")))
         (changed (log-edit-files))
