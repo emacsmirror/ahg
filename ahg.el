@@ -1232,8 +1232,8 @@ Commands:
        (list 'ahg-glog-font-lock-keywords t nil nil))
   (easy-menu-add ahg-glog-mode-menu ahg-glog-mode-map))
 
-(easy-menu-define ahg-glog-mode-menu ahg-glog-mode-map "aHg Glog"
-  '("aHg Glog"
+(easy-menu-define ahg-glog-mode-menu ahg-glog-mode-map "aHg Rev DAG"
+  '("aHg Rev DAG"
     ["View Revision Details" ahg-glog-view-details [:keys " " :active t]]
     ["View Revision Diff" ahg-glog-view-diff [:keys "=" :active t]]
     ["View Revision Diff with Other..." ahg-glog-view-diff-select-rev
