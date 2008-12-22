@@ -8,6 +8,11 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
+"""\
+print the list of all available commands
+"""
+
+
 from mercurial import commands as hgcmd
 from mercurial import extensions as hgext
 from mercurial import util
@@ -16,7 +21,7 @@ from mercurial.i18n import _
 
 def list_commands(ui, repo, **opts):
     """\
-Print the list of Mercurial commands.
+print the list of available commands
 """
     short = opts['shortlist']
     debug = not short and opts['debuglist']
