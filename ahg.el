@@ -300,6 +300,7 @@ Commands:
   (define-key ahg-status-mode-map "!" 'ahg-status-do-command)
   (define-key ahg-status-mode-map "l" 'ahg-status-short-log)
   (define-key ahg-status-mode-map "L" 'ahg-status-log)
+  (define-key ahg-status-mode-map "G" 'ahg-status-glog)
   (define-key ahg-status-mode-map "f" 'ahg-status-visit-file)
   (define-key ahg-status-mode-map "\r" 'ahg-status-visit-file)
   (define-key ahg-status-mode-map "o" 'ahg-status-visit-file-other-window)
@@ -674,6 +675,13 @@ ahg-status, and it has an ewoc associated with it."
   (let* ((files (ahg-status-get-marked nil))
          (ahg-file-list-for-log-command (if files (mapcar 'cddr files) nil)))
     (call-interactively 'ahg-log)))
+
+
+(defun ahg-status-glog ()
+  (interactive)
+  (let* ((files (ahg-status-get-marked nil))
+         (ahg-file-list-for-log-command (if files (mapcar 'cddr files) nil)))
+    (call-interactively 'ahg-glog)))
 
 ;;-----------------------------------------------------------------------------
 ;; hg commit
