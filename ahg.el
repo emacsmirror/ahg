@@ -291,6 +291,7 @@ Commands:
   (define-key ahg-status-mode-map (kbd "M-DEL") 'ahg-status-unmark-all)
   (define-key ahg-status-mode-map "c" 'ahg-status-commit)
   (define-key ahg-status-mode-map "a" 'ahg-status-add)
+  (define-key ahg-status-mode-map "A" 'ahg-status-addremove)
   (define-key ahg-status-mode-map "=" 'ahg-status-diff)
   (define-key ahg-status-mode-map "D" 'ahg-status-diff-all)
   (define-key ahg-status-mode-map "r" 'ahg-status-remove)
@@ -338,6 +339,7 @@ Commands:
     ["Commit" ahg-status-commit [:keys "c" :active t]]
     ["Add" ahg-status-add [:keys "a" :active t]]
     ["Remove" ahg-status-remove [:keys "r" :active t]]
+    ["Add/Remove" ahg-status-addremove [:keys "A" :active t]]
     ["Undo" ahg-status-undo [:keys "U" :active t]]
     ["Hg Command" ahg-status-do-command [:keys "!" :active t]]
     ["--" nil nil]
@@ -516,6 +518,27 @@ the singleton list with the node at point."
                    (message "Removed %d files" howmany))
                (ahg-show-error process)))))
       (message "hg remove aborted"))))
+
+(defun ahg-status-addremove ()
+  (interactive)
+  (let ((files (ahg-status-get-marked
+                'all (lambda (data)
+                       (or (string= (cadr data) "?")
+                           (string= (cadr data) "!"))))))
+    (if (ahg-y-or-n-p (format "Add/remove %d files to hg? " (length files)))
+        (ahg-generic-command
+         "addremove" (mapcar 'cddr files)
+         (lexical-let ((howmany (length files))
+                       (aroot (ahg-root)))
+           (lambda (process status)
+             (if (string= status "finished\n")
+                 (with-current-buffer
+                     (process-buffer process)
+                   (ahg-status-maybe-refresh aroot)
+                   (message "Added/removed %d files" howmany))
+               (ahg-show-error process)))))
+      (message "hg addremove aborted"))))
+
 
 (defun ahg-status-refresh ()
   (interactive)
