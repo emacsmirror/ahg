@@ -521,21 +521,28 @@ the singleton list with the node at point."
 
 (defun ahg-status-addremove ()
   (interactive)
-  (let ((files (ahg-status-get-marked
-                'all (lambda (data)
-                       (or (string= (cadr data) "?")
-                           (string= (cadr data) "!"))))))
-    (if (ahg-y-or-n-p (format "Add/remove %d files to hg? " (length files)))
+  (let* ((to-add (ahg-status-get-marked
+                  nil (lambda (data) (string= (cadr data) "?"))))
+         (to-remove (ahg-status-get-marked
+                     nil (lambda (data) (string= (cadr data) "!"))))
+         (files (or (append to-add to-remove)
+                    (ahg-status-get-marked
+                     'all (lambda (data)
+                            (or (string= (cadr data) "?")
+                                (string= (cadr data) "!")))))))
+    (if (ahg-y-or-n-p (format "Add %d / Remove %d files to/from hg? "
+                              (length to-add) (length to-remove)))
         (ahg-generic-command
          "addremove" (mapcar 'cddr files)
-         (lexical-let ((howmany (length files))
+         (lexical-let ((n-added (length to-add))
+                       (n-removed (length to-remove))
                        (aroot (ahg-root)))
            (lambda (process status)
              (if (string= status "finished\n")
                  (with-current-buffer
                      (process-buffer process)
                    (ahg-status-maybe-refresh aroot)
-                   (message "Added/removed %d files" howmany))
+                   (message "Added %d/removed %d files" n-added n-removed))
                (ahg-show-error process)))))
       (message "hg addremove aborted"))))
 
