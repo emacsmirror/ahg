@@ -1504,7 +1504,8 @@ Commands:
          (cmdname (car args))
          (buffer (get-buffer-create (concat "*hg command: "
                                             (ahg-root) "*")))
-         (curdir default-directory))
+         (curdir default-directory)
+         (should-refresh current-prefix-arg))
     (when ahg-do-command-extra-args
       (setq args (append args ahg-do-command-extra-args)))
     (with-current-buffer buffer
@@ -1528,12 +1529,19 @@ Commands:
            "\n\n"))))
     (ahg-generic-command
      cmdname (cdr args)
-     (lambda (process status)
-       (if (string= status "finished\n")
-           (progn
-             (pop-to-buffer (current-buffer))
-             (beginning-of-buffer))
-         (ahg-show-error process)))
+     (lexical-let ((should-refresh should-refresh)
+                   (aroot (ahg-root))
+                   (is-mq (eq major-mode 'ahg-mq-patches-mode)))
+       (lambda (process status)
+         (if (string= status "finished\n")
+             (progn
+               (when should-refresh
+                 (if is-mq
+                     (ahg-mq-patches-maybe-refresh aroot)
+                   (ahg-status-maybe-refresh aroot)))
+               (pop-to-buffer (current-buffer))
+               (beginning-of-buffer))
+           (ahg-show-error process))))
      buffer t)))
 
 ;;-----------------------------------------------------------------------------
