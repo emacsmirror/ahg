@@ -245,8 +245,8 @@ the current dir is not under hg."
     (let ((status
            (if root
                (let ((default-directory (file-name-as-directory root)))
-                 (call-process ahg-hg-command nil t nil "identify"))
-             (call-process ahg-hg-command nil t nil "identify"))))
+                 (call-process ahg-hg-command nil t nil "identify" "-nibt"))
+             (call-process ahg-hg-command nil t nil "identify" "-nibt"))))
       (when (= status 0)
         (buffer-substring-no-properties (point-min) (1- (point-max)))))))
 
