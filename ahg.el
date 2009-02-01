@@ -26,6 +26,7 @@
 (require 'diff-mode)
 (require 'easymenu)
 (require 'log-edit)
+(require 'ewoc)
 (require 'cl)
 
 ;;-----------------------------------------------------------------------------
@@ -581,7 +582,7 @@ the file on the current line."
                                         (pop-to-buffer (process-buffer process))
                                         (ahg-diff-mode)
                                         (set-buffer-modified-p nil)
-                                        (beginning-of-buffer))
+                                        (goto-char (point-min)))
                                     (ahg-show-error process)))
                                 buf)))
      ))
@@ -646,7 +647,7 @@ ahg-status, and it has an ewoc associated with it."
                (outbuf (ewoc-buffer ew))
                (cfg (with-current-buffer buf ahg-window-configuration)))
           (with-current-buffer buf
-            (beginning-of-buffer)
+            (goto-char (point-min))
             (while (not (eobp))
               (ewoc-enter-last
                ew
@@ -1193,7 +1194,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
              (progn
                (pop-to-buffer (process-buffer process))
                (ahg-log-mode)
-               (beginning-of-buffer)
+               (goto-char (point-min))
                (let ((inhibit-read-only t))
                  (insert
                   (propertize "hg log for " 'face ahg-header-line-face)
@@ -1356,7 +1357,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
              (progn
                (pop-to-buffer (process-buffer process))
                (ahg-glog-mode)
-               (beginning-of-buffer)
+               (goto-char (point-min))
                (let ((inhibit-read-only t))
                  (insert
                   (propertize "hg revision DAG for " 'face ahg-header-line-face)
@@ -1412,7 +1413,7 @@ Commands:
                                (progn
                                  (pop-to-buffer (process-buffer process))
                                  (ahg-diff-mode)
-                                 (beginning-of-buffer))
+                                 (goto-char (point-min)))
                              (ahg-show-error process)))
                          buffer)))
 
@@ -1438,7 +1439,7 @@ Commands:
       (if (= (call-process ahg-hg-command nil t nil "commands") 0)
           ;; first, we check whether the 'commands' extension is installed
           (let (out)
-            (beginning-of-buffer)
+            (goto-char (point-min))
             (while (not (eobp))
               (setq out
                     (cons
@@ -1450,7 +1451,7 @@ Commands:
         ;; otherwise, we fall back to calling 'hg help'
         (if (= (call-process ahg-hg-command nil t nil "help") 0)
             (let (out)
-              (beginning-of-buffer)
+              (goto-char (point-min))
               (search-forward "list of commands:")
               (beginning-of-line)
               (forward-line 2)
@@ -1513,7 +1514,7 @@ Commands:
     (when ahg-do-command-insert-header
       (with-current-buffer buffer
         (let ((inhibit-read-only t))
-          (beginning-of-buffer)
+          (goto-char (point-min))
           (insert
            (propertize
             (concat "output of 'hg " (mapconcat 'identity args " ") "' on ")
@@ -1534,7 +1535,7 @@ Commands:
                      (ahg-mq-patches-maybe-refresh aroot)
                    (ahg-status-maybe-refresh aroot)))
                (pop-to-buffer (current-buffer))
-               (beginning-of-buffer))
+               (goto-char (point-min)))
            (ahg-show-error process))))
      buffer t)))
 
@@ -1556,7 +1557,7 @@ Commands:
            (progn
              (pop-to-buffer (process-buffer process))
              (help-mode)
-             (beginning-of-buffer))
+             (goto-char (point-min)))
          (ahg-show-error process)))
      buffer)))
 
@@ -1592,7 +1593,7 @@ hg qseries command."
     (let ((process-environment (cons "LANG=" process-environment))) 
       (if (= (call-process ahg-hg-command nil t nil "qseries") 0)
           (let (out)
-            (beginning-of-buffer)
+            (goto-char (point-min))
             (while (not (or (looking-at "^$") (eobp)))
               (let* ((curname (buffer-substring-no-properties
                                (point-at-bol) (point-at-eol)))
@@ -1697,7 +1698,7 @@ called interactively, PATCHNAME and FORCE are read from the minibuffer.
                (ahg-mq-patches-maybe-refresh aroot)
                (let ((msg
                       (with-current-buffer (process-buffer process)
-                        (end-of-buffer)
+                        (goto-char (point-max))
                         (forward-char -1)
                         (beginning-of-line)
                         (buffer-substring-no-properties
@@ -1725,7 +1726,7 @@ read from the minibuffer.
                (ahg-mq-patches-maybe-refresh aroot)
                (let ((msg
                       (with-current-buffer (process-buffer process)
-                        (end-of-buffer)
+                        (goto-char (point-max))
                         (forward-char -1)
                         (beginning-of-line)
                         (buffer-substring-no-properties
@@ -1744,7 +1745,7 @@ read from the minibuffer.
          (progn
            (let ((msg
                   (with-current-buffer (process-buffer process)
-                    (end-of-buffer)
+                    (goto-char (point-max))
                     (forward-char -1)
                     (beginning-of-line)
                     (buffer-substring-no-properties
@@ -1840,7 +1841,7 @@ last refresh."
                (pop-to-buffer (process-buffer process))
                (setq default-directory aroot)
                (ahg-diff-mode)
-               (beginning-of-buffer))
+               (goto-char (point-min)))
            (ahg-show-error process))))
      buf)))
 
@@ -1982,12 +1983,12 @@ Commands:
       (erase-buffer)
       (setq default-directory (file-name-as-directory curdir))
       (ahg-push-window-configuration)
-      (beginning-of-buffer)
+      (goto-char (point-min))
       (let ((ew (ahg-mq-patches-create-ewoc)))
         (ahg-mq-patches-insert-contents ew patches applied guards)
         (set (make-local-variable 'ewoc) ew)))
       (toggle-read-only t)
-      (beginning-of-buffer)
+      (goto-char (point-min))
       (forward-line 1)
       (set-buffer-modified-p nil)
       (message " "))
@@ -2200,7 +2201,7 @@ destination buffer. If nil, a new buffer will be used."
   "Displays an error message for the given process."
   (let ((buf (process-buffer process)))
     (pop-to-buffer buf)
-    (beginning-of-buffer)
+    (goto-char (point-min))
     (ahg-command-mode)
     (message "aHg command exited with non-zero status: %s"
              (mapconcat 'identity (process-command process) " "))))
@@ -2253,7 +2254,7 @@ Commands:
 ;;-----------------------------------------------------------------------------
 
 (defun ahg-log-edit-hook (&optional extra-message)
-  (end-of-buffer)
+  (goto-char (point-max))
   (let ((user
          (with-temp-buffer
            (if (= (call-process ahg-hg-command nil t nil "showconfig"
@@ -2289,7 +2290,7 @@ HG: committing %s"
                   (lambda (s) (replace-regexp-in-string root-regexp "" s))
                   changed " ")
                "ALL CHANGES (run 'ahg-status' for the details)")))
-  (beginning-of-buffer)))
+  (goto-char (point-min))))
 
 (defun ahg-log-edit (callback file-list-function buffer &optional msg)
   "Sets up a log-edit buffer for committing hg changesets."
@@ -2308,7 +2309,7 @@ HG: committing %s"
   "Returns the contents of the current buffer, discarding lines
 starting with 'HG:'."
   (let ((out))
-    (beginning-of-buffer)
+    (goto-char (point-min))
     (while (not (eobp))
       (unless (looking-at "^HG:")
         (setq out
