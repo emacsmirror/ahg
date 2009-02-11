@@ -761,8 +761,9 @@ flag to hg update."
   (interactive
    (let* ((rev (funcall ahg-update-to-rev-get-revision-function))
           (ans (and rev (ahg-y-or-n-p (format "Update to revision %s? " rev))))
-          (overw (and ans (ahg-uncommitted-changes-p)
-                      (ahg-y-or-n-p "Overwrite local changes? "))))
+          (overw (and ans (if (ahg-uncommitted-changes-p)
+                              (ahg-y-or-n-p "Overwrite local changes? ")
+                            t))))
      (list (and ans rev) overw)))
   (when rev
     (ahg-generic-command
