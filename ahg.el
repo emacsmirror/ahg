@@ -2302,7 +2302,7 @@ HG: committing %s"
     (log-edit
      callback
      t
-     (if (version< emacs-version "22.2") file-list-function
+     (if (version< emacs-version "23.0") file-list-function
        (list (cons 'log-edit-listfun file-list-function)))
      buffer)))
 
