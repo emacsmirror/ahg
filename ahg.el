@@ -1977,7 +1977,8 @@ Commands:
          (ew (ewoc-create 'ahg-mq-patch-pp header footer)))
     ew))
 
-(defun ahg-mq-show-patches-buffer (buf patches applied guards curdir no-pop)
+(defun ahg-mq-show-patches-buffer (buf patches applied guards curdir no-pop
+                                       point-pos)
   (with-current-buffer buf
     (ahg-mq-patches-mode)    
     (let ((inhibit-read-only t))
@@ -1989,8 +1990,10 @@ Commands:
         (ahg-mq-patches-insert-contents ew patches applied guards)
         (set (make-local-variable 'ewoc) ew)))
       (toggle-read-only t)
-      (goto-char (point-min))
-      (forward-line 1)
+      (if (>= point-pos 0)
+          (goto-char point-pos)
+        (goto-char (point-min))
+        (forward-line 1))
       (set-buffer-modified-p nil)
       (message " "))
   (unless no-pop
@@ -2007,6 +2010,7 @@ Commands:
 
 
 (defvar ahg-mq-list-patches-no-pop nil)
+(defvar ahg-mq-patches-buffer-point -1)
 
 (defun ahg-mq-list-patches (&optional root)
   "List all mq patches in the queue, showing also information
@@ -2019,7 +2023,8 @@ about which are currently applied."
      (lexical-let ((buf buf)
                    (curdir default-directory)
                    (aroot root)
-                   (no-pop ahg-mq-list-patches-no-pop))
+                   (no-pop ahg-mq-list-patches-no-pop)
+                   (point-pos ahg-mq-patches-buffer-point))
        (lambda (process status) ;; parse output of hg qseries
          (if (string= status "finished\n")
              (let ((patches
@@ -2031,7 +2036,8 @@ about which are currently applied."
                 (lexical-let ((buf buf)
                               (patches patches)
                               (curdir curdir)
-                              (no-pop no-pop))
+                              (no-pop no-pop)
+                              (point-pos point-pos))
                   (lambda (process status) ;; parse output of hg qapplied
                     (if (string= status "finished\n")
                         (let ((applied
@@ -2045,7 +2051,8 @@ about which are currently applied."
                                          (patches patches)
                                          (applied applied)
                                          (curdir curdir)
-                                         (no-pop no-pop))
+                                         (no-pop no-pop)
+                                         (point-pos point-pos))
                              (lambda (process status)
                                (if (string= status "finished\n")
                                    (let
@@ -2060,7 +2067,7 @@ about which are currently applied."
                                      ;; and show the buffer
                                      (ahg-mq-show-patches-buffer
                                       buf patches applied guards curdir
-                                      no-pop))
+                                      no-pop point-pos))
                                  ;; error in hg qguard
                                  (kill-buffer buf)
                                  (ahg-show-error process))))))
@@ -2078,7 +2085,8 @@ about which are currently applied."
     (let ((buf (ahg-mq-get-patches-buffer root t))
           (default-directory (file-name-as-directory root)))
       (when buf
-        (let ((ahg-mq-list-patches-no-pop t))
+        (let ((ahg-mq-list-patches-no-pop t)
+              (ahg-mq-patches-buffer-point (with-current-buffer buf (point))))
           (ahg-mq-list-patches root))))))
 
 
