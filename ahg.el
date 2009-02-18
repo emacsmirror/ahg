@@ -400,9 +400,10 @@ to pass extra switches to hg status."
       (ahg-push-window-configuration))
     (ahg-generic-command
      "status" extra-switches
-     (lexical-let ((no-pop ahg-status-no-pop))
+     (lexical-let ((no-pop ahg-status-no-pop)
+                   (point-pos ahg-status-point-pos))
        (lambda (process status)
-         (ahg-status-sentinel process status no-pop))) buf)))
+         (ahg-status-sentinel process status no-pop point-pos))) buf)))
 
 (defun ahg-status-pp (data)
   "Pretty-printer for data elements in a *hg status* buffer."
@@ -544,14 +545,16 @@ the singleton list with the node at point."
 
 (defun ahg-status-refresh ()
   (interactive)
-  (ahg-status))
+  (let ((ahg-status-point-pos (point)))
+    (ahg-status)))
 
 
 (defun ahg-status-maybe-refresh (root)
   (when ahg-auto-refresh-status-buffer
     (let ((buf (ahg-get-status-buffer root)))
       (when buf
-        (let ((ahg-status-no-pop t))
+        (let ((ahg-status-no-pop t)
+              (ahg-status-point-pos (with-current-buffer buf (point))))
           (ahg-status))))))
 
 
@@ -636,8 +639,9 @@ ahg-status, and it has an ewoc associated with it."
     (funcall (if create 'get-buffer-create 'get-buffer) name)))
 
 (defvar ahg-status-no-pop nil)
+(defvar ahg-status-point-pos -1)
 
-(defun ahg-status-sentinel (process status &optional no-pop)
+(defun ahg-status-sentinel (process status &optional no-pop point-pos)
   (with-temp-message (or (current-message) "")
     (if (string= status "finished\n")
         ;; everything was ok, we can show the status buffer
@@ -661,7 +665,8 @@ ahg-status, and it has an ewoc associated with it."
           (set (make-local-variable 'ahg-window-configuration) cfg)
           (let ((inhibit-read-only t)
                 (node (ewoc-nth ew 0)))
-            (when node (goto-char (ewoc-location node)))))
+            (when node (goto-char (ewoc-location node))))
+          (when (>= point-pos 0) (goto-char point-pos)))
       ;; error, we signal it and pop to the buffer
       (ahg-show-error process))))
 
