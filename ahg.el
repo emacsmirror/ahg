@@ -666,7 +666,8 @@ ahg-status, and it has an ewoc associated with it."
           (let ((inhibit-read-only t)
                 (node (ewoc-nth ew 0)))
             (when node (goto-char (ewoc-location node))))
-          (when (>= point-pos 0) (goto-char point-pos)))
+          (when (>= point-pos 0)
+            (with-current-buffer outbuf (goto-char point-pos))))
       ;; error, we signal it and pop to the buffer
       (ahg-show-error process))))
 
