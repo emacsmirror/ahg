@@ -545,7 +545,7 @@ the singleton list with the node at point."
 
 (defun ahg-status-refresh ()
   (interactive)
-  (let ((ahg-status-point-pos (point)))
+  (let ((ahg-status-point-pos (ahg-line-point-pos)))
     (ahg-status)))
 
 
@@ -554,7 +554,8 @@ the singleton list with the node at point."
     (let ((buf (ahg-get-status-buffer root)))
       (when buf
         (let ((ahg-status-no-pop t)
-              (ahg-status-point-pos (with-current-buffer buf (point))))
+              (ahg-status-point-pos
+               (with-current-buffer buf (ahg-line-point-pos))))
           (ahg-status))))))
 
 
@@ -639,7 +640,7 @@ ahg-status, and it has an ewoc associated with it."
     (funcall (if create 'get-buffer-create 'get-buffer) name)))
 
 (defvar ahg-status-no-pop nil)
-(defvar ahg-status-point-pos -1)
+(defvar ahg-status-point-pos nil)
 
 (defun ahg-status-sentinel (process status &optional no-pop point-pos)
   (with-temp-message (or (current-message) "")
@@ -666,8 +667,9 @@ ahg-status, and it has an ewoc associated with it."
           (let ((inhibit-read-only t)
                 (node (ewoc-nth ew 0)))
             (when node (goto-char (ewoc-location node))))
-          (when (>= point-pos 0)
-            (with-current-buffer outbuf (goto-char point-pos))))
+          (when point-pos
+            (with-current-buffer outbuf
+              (ahg-goto-line-point point-pos))))
       ;; error, we signal it and pop to the buffer
       (ahg-show-error process))))
 
@@ -1888,7 +1890,7 @@ last refresh."
 (defvar ahg-mq-patches-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map [?q] 'ahg-buffer-quit)
-    (define-key map [?g] 'ahg-mq-list-patches)
+    (define-key map [?g] 'ahg-mq-patch-list-refresh)
     (define-key map [?D] 'ahg-mq-patches-delete-patch)
     (define-key map [?!] 'ahg-do-command)
     (define-key map [?h] 'ahg-command-help)
@@ -1925,7 +1927,7 @@ last refresh."
     ["Hg Command" ahg-do-command [:keys "!" :active t]]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
-    ["Refresh" ahg-mq-list-patches [:keys "g" :active t]]
+    ["Refresh" ahg-mq-patch-list-refresh [:keys "g" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]
     ))
 
@@ -1996,8 +1998,8 @@ Commands:
         (ahg-mq-patches-insert-contents ew patches applied guards)
         (set (make-local-variable 'ewoc) ew)))
       (toggle-read-only t)
-      (if (>= point-pos 0)
-          (goto-char point-pos)
+      (if point-pos
+          (ahg-goto-line-point point-pos)
         (goto-char (point-min))
         (forward-line 1))
       (set-buffer-modified-p nil)
@@ -2016,7 +2018,7 @@ Commands:
 
 
 (defvar ahg-mq-list-patches-no-pop nil)
-(defvar ahg-mq-patches-buffer-point -1)
+(defvar ahg-mq-patches-buffer-point nil)
 
 (defun ahg-mq-list-patches (&optional root)
   "List all mq patches in the queue, showing also information
@@ -2086,13 +2088,20 @@ about which are currently applied."
      )))
 
 
+(defun ahg-mq-patch-list-refresh ()
+  (interactive)
+  (let ((ahg-mq-patches-buffer-point (ahg-line-point-pos)))
+    (ahg-mq-list-patches)))
+
+
 (defun ahg-mq-patches-maybe-refresh (root)
   (when ahg-auto-refresh-status-buffer
     (let ((buf (ahg-mq-get-patches-buffer root t))
           (default-directory (file-name-as-directory root)))
       (when buf
         (let ((ahg-mq-list-patches-no-pop t)
-              (ahg-mq-patches-buffer-point (with-current-buffer buf (point))))
+              (ahg-mq-patches-buffer-point
+               (with-current-buffer buf (ahg-line-point-pos))))
           (ahg-mq-list-patches root))))))
 
 
@@ -2263,6 +2272,14 @@ Commands:
                   (list ahg-hg-command nil t nil "id" "-n"))))
       (when (= (apply 'call-process args) 0)
         (= (char-before (1- (point-max))) ?+)))))
+
+(defun ahg-line-point-pos ()
+  (cons (line-number-at-pos) (- (point) (point-at-bol))))
+
+(defun ahg-goto-line-point (lp)
+  (goto-char (point-min))
+  (goto-line (car lp))
+  (forward-char (min (cdr lp) (- (point-at-eol) (point-at-bol)))))
 
 ;;-----------------------------------------------------------------------------
 ;; log-edit related functions
