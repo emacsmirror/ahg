@@ -754,7 +754,11 @@ ahg-status, and it has an ewoc associated with it."
   (interactive)
   (cond ((eq major-mode 'ahg-status-mode)
          (call-interactively 'ahg-status-commit))
-        ((buffer-file-name) (ahg-commit (list (buffer-file-name))))
+        ((buffer-file-name)
+         (when (and (buffer-modified-p)
+                    (ahg-y-or-n-p "Save buffer before committing? "))
+           (save-buffer))
+         (ahg-commit (list (buffer-file-name))))
         (t (message "hg commit: no file found, aborting."))))
 
 ;;-----------------------------------------------------------------------------
@@ -2308,7 +2312,8 @@ HG: Enter commit message.  Lines beginning with 'HG:' are removed.
 HG: user: %s
 HG: root: %s
 HG: branch: %s
-HG: committing %s"
+HG: committing %s
+HG: Press C-c C-c when you are done editing."
              (if extra-message
                  (concat
                   (mapconcat (lambda (s) (concat "HG: " s))
