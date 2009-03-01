@@ -391,7 +391,8 @@ Commands:
 to pass extra switches to hg status."
   (interactive)
   (let ((buf (get-buffer-create "*aHg-status*"))
-        (curdir default-directory))
+        (curdir default-directory)
+        (show-message (interactive-p)))
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer))
@@ -403,7 +404,8 @@ to pass extra switches to hg status."
      (lexical-let ((no-pop ahg-status-no-pop)
                    (point-pos ahg-status-point-pos))
        (lambda (process status)
-         (ahg-status-sentinel process status no-pop point-pos))) buf)))
+         (ahg-status-sentinel process status no-pop point-pos))) buf
+         nil (not show-message))))
 
 (defun ahg-status-pp (data)
   "Pretty-printer for data elements in a *hg status* buffer."
@@ -546,7 +548,7 @@ the singleton list with the node at point."
 (defun ahg-status-refresh ()
   (interactive)
   (let ((ahg-status-point-pos (ahg-line-point-pos)))
-    (ahg-status)))
+    (call-interactively 'ahg-status)))
 
 
 (defun ahg-status-maybe-refresh (root)
@@ -2029,14 +2031,18 @@ Commands:
 about which are currently applied."
   (interactive)
   (unless root (setq root (ahg-root)))
-  (let ((buf (ahg-mq-get-patches-buffer root)))
+  (let ((buf (ahg-mq-get-patches-buffer root))
+        (msg (when (interactive-p)
+               (format "aHg: getting patch queue for %s..." root))))
+    (when msg (message msg))
     (ahg-generic-command
      "qseries" nil
      (lexical-let ((buf buf)
                    (curdir default-directory)
                    (aroot root)
                    (no-pop ahg-mq-list-patches-no-pop)
-                   (point-pos ahg-mq-patches-buffer-point))
+                   (point-pos ahg-mq-patches-buffer-point)
+                   (msg msg))
        (lambda (process status) ;; parse output of hg qseries
          (if (string= status "finished\n")
              (let ((patches
@@ -2049,7 +2055,8 @@ about which are currently applied."
                               (patches patches)
                               (curdir curdir)
                               (no-pop no-pop)
-                              (point-pos point-pos))
+                              (point-pos point-pos)
+                              (msg msg))
                   (lambda (process status) ;; parse output of hg qapplied
                     (if (string= status "finished\n")
                         (let ((applied
@@ -2064,7 +2071,8 @@ about which are currently applied."
                                          (applied applied)
                                          (curdir curdir)
                                          (no-pop no-pop)
-                                         (point-pos point-pos))
+                                         (point-pos point-pos)
+                                         (msg msg))
                              (lambda (process status)
                                (if (string= status "finished\n")
                                    (let
@@ -2079,23 +2087,24 @@ about which are currently applied."
                                      ;; and show the buffer
                                      (ahg-mq-show-patches-buffer
                                       buf patches applied guards curdir
-                                      no-pop point-pos))
+                                      no-pop point-pos)
+                                     (when msg (message "%sdone" msg)))
                                  ;; error in hg qguard
                                  (kill-buffer buf)
-                                 (ahg-show-error process))))))
+                                 (ahg-show-error process)))) nil nil t))
                       ;; error in hg qapplied
                       (kill-buffer buf)
-                      (ahg-show-error process))))))
+                      (ahg-show-error process)))) nil nil t))
            ;; error in hg qseries
            (kill-buffer buf)
            (ahg-show-error process))))
-     )))
+     nil nil t)))
 
 
 (defun ahg-mq-patch-list-refresh ()
   (interactive)
   (let ((ahg-mq-patches-buffer-point (ahg-line-point-pos)))
-    (ahg-mq-list-patches)))
+    (call-interactively 'ahg-mq-list-patches)))
 
 
 (defun ahg-mq-patches-maybe-refresh (root)
@@ -2202,7 +2211,8 @@ stack of applied patches."
     (ahg-pop-window-configuration)
     (kill-buffer buf)))
 
-(defun ahg-generic-command (command args sentinel &optional buffer use-shell)
+(defun ahg-generic-command (command args sentinel
+                                    &optional buffer use-shell no-show-message)
   "Executes then given hg command, with the given
 arguments. SENTINEL is a sentinel function. BUFFER is the
 destination buffer. If nil, a new buffer will be used."
@@ -2210,17 +2220,19 @@ destination buffer. If nil, a new buffer will be used."
   (with-current-buffer buffer
     (setq mode-line-process
           (list (concat ":" (propertize "%s" 'face '(:foreground "#DD0000"))))))
-  (message "aHg: executing hg '%s' command..." command)
+  (unless no-show-message (message "aHg: executing hg '%s' command..." command))
   (let ((process
          (apply (if use-shell 'start-process-shell-command 'start-process)
                 (concat "*ahg-command-" command "*") buffer
                 ahg-hg-command command args)))
     (set-process-sentinel process
                           (lexical-let ((sf sentinel)
-                                        (cmd command))
+                                        (cmd command)
+                                        (no-show-message no-show-message))
                             (lambda (p s)
-                              (message "aHg: executing hg '%s' command...done"
-                                       cmd)
+                              (unless no-show-message
+                                (message "aHg: executing hg '%s' command...done"
+                                         cmd))
                               (setq mode-line-process nil)
                               (funcall sf p s))))
     ))
