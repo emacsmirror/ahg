@@ -1510,14 +1510,17 @@ Commands:
                   (completing-read ahg-do-command-prompt
                                    (dynamic-completion-table
                                     ahg-complete-command)))))
-  (let* ((args (split-string cmdstring))
+  (let* ((args (split-string cmdstring " "))
          (cmdname (car args))
+         (cmdargs (mapconcat 'identity (cdr args) " "))
          (buffer (get-buffer-create (concat "*hg command: "
                                             (ahg-root) "*")))
          (curdir default-directory)
          (should-refresh current-prefix-arg))
     (when ahg-do-command-extra-args
-      (setq args (append args ahg-do-command-extra-args)))
+      (setq cmdargs
+            (concat cmdargs
+                    (mapconcat 'identity ahg-do-command-extra-args " "))))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (ahg-command-mode)
@@ -1532,13 +1535,13 @@ Commands:
           (goto-char (point-min))
           (insert
            (propertize
-            (concat "output of 'hg " (mapconcat 'identity args " ") "' on ")
+            (concat "output of 'hg " cmdname " " cmdargs "' on ")
             'face ahg-header-line-face)
            (propertize default-directory 'face ahg-header-line-root-face)
            "\n" (make-string (1- (window-width (selected-window))) ?-)
            "\n\n"))))
     (ahg-generic-command
-     cmdname (cdr args)
+     cmdname (list cmdargs)
      (lexical-let ((should-refresh should-refresh)
                    (aroot (ahg-root))
                    (is-mq (eq major-mode 'ahg-mq-patches-mode)))
