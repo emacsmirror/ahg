@@ -2215,7 +2215,8 @@ stack of applied patches."
     (kill-buffer buf)))
 
 (defun ahg-generic-command (command args sentinel
-                                    &optional buffer use-shell no-show-message)
+                                    &optional buffer use-shell
+                                              no-show-message i18n)
   "Executes then given hg command, with the given
 arguments. SENTINEL is a sentinel function. BUFFER is the
 destination buffer. If nil, a new buffer will be used."
@@ -2224,20 +2225,25 @@ destination buffer. If nil, a new buffer will be used."
     (setq mode-line-process
           (list (concat ":" (propertize "%s" 'face '(:foreground "#DD0000"))))))
   (unless no-show-message (message "aHg: executing hg '%s' command..." command))
-  (let ((process
-         (apply (if use-shell 'start-process-shell-command 'start-process)
-                (concat "*ahg-command-" command "*") buffer
-                ahg-hg-command command args)))
-    (set-process-sentinel process
-                          (lexical-let ((sf sentinel)
-                                        (cmd command)
-                                        (no-show-message no-show-message))
-                            (lambda (p s)
-                              (unless no-show-message
-                                (message "aHg: executing hg '%s' command...done"
-                                         cmd))
-                              (setq mode-line-process nil)
-                              (funcall sf p s))))
+  (let ((lang (getenv "LANG")))
+    (unless i18n (setenv "LANG"))
+    (let ((process
+           (apply (if use-shell 'start-process-shell-command 'start-process)
+                  (concat "*ahg-command-" command "*") buffer
+                  ahg-hg-command command args)))
+      (set-process-sentinel
+       process
+       (lexical-let ((sf sentinel)
+                     (cmd command)
+                     (no-show-message no-show-message))
+         (lambda (p s)
+           (unless no-show-message
+             (message "aHg: executing hg '%s' command...done"
+                      cmd))
+           (setq mode-line-process nil)
+           (funcall sf p s))))
+      )
+    (setenv "LANG" lang)
     ))
 
 (defun ahg-show-error (process)
