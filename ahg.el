@@ -140,6 +140,16 @@ operations (e.g. add, remove, commit) are performed."
   "If non-nil, use short form (y or n) when asking for confimation to the user."
   :group 'ahg :type 'boolean)
 
+(defcustom ahg-i18n t
+  "If non-nil, use i18n when calling Mercurial.
+Note: disabling i18n is done by unsetting the LANG environment variable
+when calling hg. This might not always work."
+  :group 'ahg :type 'boolean)
+
+(defcustom ahg-subprocess-coding-system nil
+  "If non-nil, coding system used when reading output of hg commands."
+  :group 'ahg :type 'symbol)
+
 (defface ahg-status-marked-face
   '((default (:inherit font-lock-preprocessor-face)))
   "Face for marked files in aHg status buffers." :group 'ahg)
@@ -2216,7 +2226,7 @@ stack of applied patches."
 
 (defun ahg-generic-command (command args sentinel
                                     &optional buffer use-shell
-                                              no-show-message i18n)
+                                              no-show-message)
   "Executes then given hg command, with the given
 arguments. SENTINEL is a sentinel function. BUFFER is the
 destination buffer. If nil, a new buffer will be used."
@@ -2226,11 +2236,13 @@ destination buffer. If nil, a new buffer will be used."
           (list (concat ":" (propertize "%s" 'face '(:foreground "#DD0000"))))))
   (unless no-show-message (message "aHg: executing hg '%s' command..." command))
   (let ((lang (getenv "LANG")))
-    (unless i18n (setenv "LANG"))
+    (unless ahg-i18n (setenv "LANG"))
     (let ((process
            (apply (if use-shell 'start-process-shell-command 'start-process)
                   (concat "*ahg-command-" command "*") buffer
                   ahg-hg-command command args)))
+      (when ahg-subprocess-coding-system
+        (set-process-coding-system process ahg-subprocess-coding-system))
       (set-process-sentinel
        process
        (lexical-let ((sf sentinel)
