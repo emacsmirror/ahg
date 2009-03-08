@@ -1564,6 +1564,19 @@ Commands:
 (defvar ahg-do-command-extra-args nil)
 
 (defun ahg-do-command (cmdstring)
+  "Execute an arbitrary hg command CMDSTRING.
+CMDSTRING should not include 'hg' as first argument, as this is
+implicit.
+
+When run from an *aHg-status* buffer, the selected files are
+passed as extra arguments. In this case, if there is a `*' in
+CMDSTRING, surrounded by whitespace, the list of files is
+substituted there. Otherwise, the list of files is appended to
+CMDSTRING.
+
+With a non-nil prefix arg, upon successful completion the status
+buffer is automatically refreshed. (If called from an MQ patches buffer,
+that buffer is refreshed instead.)"
   (interactive (list
                 (let ((minibuffer-local-completion-map
                        (copy-keymap minibuffer-local-map)))
@@ -1575,14 +1588,18 @@ Commands:
   (let* ((args (split-string cmdstring " "))
          (cmdname (car args))
          (cmdargs (mapconcat 'identity (cdr args) " "))
+         (interpolate (member "*" (cdr args)))
          (buffer (get-buffer-create (concat "*hg command: "
                                             (ahg-root) "*")))
          (curdir default-directory)
          (should-refresh current-prefix-arg))
     (when ahg-do-command-extra-args
-      (setq cmdargs
-            (concat cmdargs
-                    (mapconcat 'identity ahg-do-command-extra-args " "))))
+      (let ((extra (mapconcat 'identity ahg-do-command-extra-args " ")))
+        (setq cmdargs
+              (if interpolate
+                  (replace-regexp-in-string
+                   "\\([*]\\).*\\'" extra cmdargs nil nil 1)
+                (concat cmdargs " " extra)))))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (ahg-command-mode)
