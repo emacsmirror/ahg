@@ -1202,8 +1202,10 @@ a prefix argument, prompts also for EXTRA-FLAGS."
    (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))
   (let ((buffer (get-buffer-create
                  (concat "*hg log (details): " (ahg-root) "*")))
-        (command-list (ahg-args-add-revs r1 r2)))  
-    (setq command-list (append command-list (list "-v")
+        (command-list (ahg-args-add-revs r1 r2))
+        (template "{rev}:{node|short}\\n{branches}\\n{tags}\\n{parents}\\n{author}\\n{date|date}\\n{files}\\n\\t{desc|tabindent}\\n"))  
+    (setq command-list (append command-list
+                               (list "-v" "--template" template)
                                (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
@@ -1218,6 +1220,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
          (if (string= status "finished\n")
              (progn
                (pop-to-buffer (process-buffer process))
+               (ahg-format-log-buffer)
                (ahg-log-mode)
                (goto-char (point-min))
                (let ((inhibit-read-only t))
@@ -1227,6 +1230,55 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                   "\n\n")))
            (ahg-show-error process))))
      buffer)))
+
+(defun ahg-format-log-buffer ()
+  (goto-char (point-min))
+  (let ((inhibit-read-only t))
+    (labels ((next () (beginning-of-line) (forward-line 1)))
+      (while (not (eobp))
+        ;; first line, changeset
+        (insert "changeset:   ")
+        (next)
+        ;; second line, branch
+        (if (looking-at "^$")
+            (delete-char 1)
+          (insert "branch:      ")
+          (next))
+        ;; third line, tags
+        (if (looking-at "^$")
+            (delete-char 1) ;; remove empty line
+          ;; otherwise, insert a "tag: " entry for each entry in the list
+          (let ((tags (split-string (buffer-substring-no-properties
+                                     (point-at-bol) (point-at-eol))))
+                (kill-whole-line t))
+            (kill-line)
+            (mapcar (lambda (tag) (insert "tag:         " tag "\n")) tags)))
+        ;; fourth line, parents
+        (if (looking-at "^$")
+            (delete-char 1) 
+          (let ((parents (split-string (buffer-substring-no-properties
+                                        (point-at-bol) (point-at-eol))))
+                (kill-whole-line t))
+            (kill-line)
+            (mapcar (lambda (p) (insert "parent:      " p "\n")) parents)))
+        ;; fifth line, user
+        (insert "user:        ")
+        (next)
+        ;; sixth line, date
+        (insert "date:        ")
+        (next)
+        ;; seventh line, files
+        (insert "files:       ")
+        (next)
+        ;; rest is the description
+        (insert "description:\n")
+        ;; each line in the description starts with a '\t'
+        (while (and (looking-at "^\\(\t\\|$\\)") (not (eobp)))
+          (unless (looking-at "^$")
+            (delete-char 1)) ;; remove the \t in front of the line
+          (next))
+        (insert "\n\n")
+        ))))
 
 (defun ahg-log-cur-file (&optional prefix)
   "Shows changelog of the current file. When called interactively
