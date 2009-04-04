@@ -1757,11 +1757,20 @@ only the selected files will be refreshed."
                     (buffer-substring-no-properties
                      (point-min) (1- (point-max))))))
                (msg (when patchname
-                      (concat "Refreshing mq patch: " patchname))))
+                      (concat "Refreshing mq patch: " patchname)))
+               (content
+                (with-temp-buffer
+                  (when
+                      (= (if patchname
+                             (call-process ahg-hg-command nil t nil
+                                           "qheader" patchname)
+                           (call-process ahg-hg-command nil t nil "qheader")) 0)
+                    (buffer-substring-no-properties
+                     (point-min) (1- (point-max)))))))
           (ahg-log-edit
            (lambda () (interactive) (ahg-mq-log-callback "qrefresh"))
            (lexical-let ((flist files)) (lambda () flist))
-           buf msg))
+           buf msg content))
       (ahg-generic-command
        "qrefresh" files
        (lexical-let ((aroot (ahg-root)))
@@ -1910,12 +1919,19 @@ Pops a buffer for entering the commit message."
                (point-min) (1- (point-max))))))
          (msg (when patchname
                 (concat "Converting mq patch: " patchname
-                        " to regular changeset"))))
+                        " to regular changeset")))
+         (content
+          (with-temp-buffer
+            (when (= (if patchname
+                         (call-process ahg-hg-command nil t nil
+                                       "qheader" patchname)
+                       (call-process ahg-hg-command nil t nil "qheader")) 0)
+              (buffer-substring-no-properties (point-min) (1- (point-max)))))))
     (ahg-log-edit
      'ahg-mq-convert-patch-to-changeset-callback
      (lambda () nil)
      buf
-     msg)))
+     msg content)))
 
 
 (defun ahg-qdiff (files)
@@ -2391,7 +2407,7 @@ Commands:
 ;; log-edit related functions
 ;;-----------------------------------------------------------------------------
 
-(defun ahg-log-edit-hook (&optional extra-message)
+(defun ahg-log-edit-hook (&optional extra-message content)
   (goto-char (point-max))
   (let ((user
          (with-temp-buffer
@@ -2407,7 +2423,7 @@ Commands:
         (changed (log-edit-files))
         (root-regexp (concat "^" (regexp-quote default-directory))))
     (insert
-     (format "
+     (format "%s
 
 HG: Enter commit message.  Lines beginning with 'HG:' are removed.
 %sHG: --
@@ -2416,6 +2432,7 @@ HG: root: %s
 HG: branch: %s
 HG: committing %s
 HG: Press C-c C-c when you are done editing."
+             (or content "")
              (if extra-message
                  (concat
                   (mapconcat (lambda (s) (concat "HG: " s))
@@ -2431,11 +2448,13 @@ HG: Press C-c C-c when you are done editing."
                "ALL CHANGES (run 'ahg-status' for the details)")))
   (goto-char (point-min))))
 
-(defun ahg-log-edit (callback file-list-function buffer &optional msg)
+(defun ahg-log-edit (callback file-list-function buffer &optional msg content)
   "Sets up a log-edit buffer for committing hg changesets."
   (let ((log-edit-hook
-         (list (if msg (lexical-let ((msg msg))
-                         (lambda () (ahg-log-edit-hook msg)))
+         (list (if (or msg content)
+                   (lexical-let ((msg msg)
+                                 (content content))
+                         (lambda () (ahg-log-edit-hook msg content)))
                  'ahg-log-edit-hook))))
     (log-edit
      callback
