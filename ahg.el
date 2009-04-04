@@ -1547,6 +1547,8 @@ Commands:
           ;; match
           (list command))))))
 
+(defvar ahg-complete-command-directory-for-filename-completion nil)
+
 (defun ahg-complete-command (command)
   ;; we split the string, and treat the last word as a filename
   (let* ((idx (string-match "\\([^ ]+\\)$" command))
@@ -1554,8 +1556,13 @@ Commands:
           (cond ((= idx 0) (ahg-complete-command-name command))
                 ((and (= idx 5) (string= (substring command 0 idx) "help "))
                  (ahg-complete-command-name (substring command idx)))
-                (t (file-expand-wildcards
-                    (concat (substring command idx) "*")))))
+                (t
+                 (let ((default-directory
+                         (or
+                          ahg-complete-command-directory-for-filename-completion
+                          default-directory)))
+                   (file-expand-wildcards
+                    (concat (substring command idx) "*"))))))
          (prev (substring command 0 idx)))
     (mapcar (function (lambda (a) (concat prev a))) matches)))
 
@@ -1996,7 +2003,7 @@ last refresh."
     (define-key map [?q] 'ahg-buffer-quit)
     (define-key map [?g] 'ahg-mq-patch-list-refresh)
     (define-key map [?D] 'ahg-mq-patches-delete-patch)
-    (define-key map [?!] 'ahg-do-command)
+    (define-key map [?!] 'ahg-mq-do-command)
     (define-key map [?h] 'ahg-command-help)
     (define-key map [?=] 'ahg-mq-patches-view-patch)
     (define-key map [?\r] 'ahg-mq-patches-goto-patch)
@@ -2028,7 +2035,7 @@ last refresh."
     ["Convert Current Patch to Changeset"
      ahg-mq-patches-convert-patch-to-changeset [:keys "f" :active t]]
     ["--" nil nil]
-    ["Hg Command" ahg-do-command [:keys "!" :active t]]
+    ["Hg Command" ahg-mq-do-command [:keys "!" :active t]]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
     ["Refresh" ahg-mq-patch-list-refresh [:keys "g" :active t]]
@@ -2288,6 +2295,15 @@ stack of applied patches."
                                    curpatch))
              (ahg-mq-convert-patch-to-changeset))
       (message "aHg Error: unable to determine current patch!"))))
+
+
+(defun ahg-mq-do-command ()
+  "Call `ahg-do-command', but set `default-directory' to the MQ patches dir,
+so that filename completion works on patch names."
+  (interactive)
+  (let ((ahg-complete-command-directory-for-filename-completion
+         (concat (file-name-as-directory (ahg-root)) ".hg/patches/")))
+    (call-interactively 'ahg-do-command)))
 
 ;;-----------------------------------------------------------------------------
 ;; Various helper functions
