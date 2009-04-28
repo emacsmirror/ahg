@@ -77,6 +77,7 @@
     (define-key map "l" 'ahg-short-log)
     (define-key map "L" 'ahg-log)
     (define-key map "G" 'ahg-glog)
+    (define-key map "g" 'ahg-glog)
     (define-key map "!" 'ahg-do-command)
     (define-key map "h" 'ahg-command-help)
     (define-key map "c" 'ahg-commit-cur-file)
@@ -234,6 +235,12 @@ when calling hg. This might not always work."
 (defvar ahg-short-log-user-face 'ahg-short-log-user-face)
 (defvar ahg-header-line-face 'ahg-header-line-face)
 (defvar ahg-header-line-root-face 'ahg-header-line-root-face)
+(defvar ahg-invisible-face
+  (progn
+    (copy-face 'default 'ahg-invisible-face)
+    (set-face-foreground 'ahg-invisible-face (face-background 'default))
+    'ahg-invisible-face))
+
 
 ;;-----------------------------------------------------------------------------
 ;; hg root
@@ -1315,8 +1322,14 @@ prompts also for extra flags."
      2 ahg-short-log-date-face)
     ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  \\([^ ]+\\)" 2
      ahg-short-log-user-face)
-    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  \\(.+\\)$" 2
-     ahg-log-branch-face)
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  \\(\\[[^]]+\\]\\)"
+     2 ahg-log-branch-face) ;; tags
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  \\(\\[\\]\\)" 2
+     ahg-invisible-face) ;; empty tags
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  [^ ]+ \\(([^)]+)\\)$"
+     2 ahg-log-branch-face) ;; branches
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  [^ ]+ \\(()\\)$" 2
+     ahg-invisible-face) ;; empty branches    
     )
   "Keywords in `ahg-glog-mode' mode.")
 
@@ -1344,6 +1357,7 @@ Commands:
   (define-key ahg-glog-mode-map [? ] 'ahg-glog-view-details)
   (set (make-local-variable 'font-lock-defaults)
        (list 'ahg-glog-font-lock-keywords t nil nil))
+  (set-face-foreground 'ahg-invisible-face (face-background 'default))
   (easy-menu-add ahg-glog-mode-menu ahg-glog-mode-map))
 
 (easy-menu-define ahg-glog-mode-menu ahg-glog-mode-map "aHg Rev DAG"
@@ -1418,7 +1432,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
     (setq command-list
           (append command-list
                   (list "--template"
-                        "{rev}  {node|short}  {date|shortdate}  {author|user}  [{tags}]\\n  {desc|firstline}\\n\\n")
+                        "{rev}  {node|short}  {date|shortdate}  {author|user}  [{tags}] ({branches})\\n  {desc|firstline}\\n\\n")
                   (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
