@@ -2415,7 +2415,7 @@ Commands:
   (cons (line-number-at-pos) (- (point) (point-at-bol))))
 
 (defun ahg-goto-line-point (lp)
-  (goto-char (point-min))
+  ;;(goto-char (point-min))
   (goto-line (car lp))
   (forward-char (min (cdr lp) (- (point-at-eol) (point-at-bol)))))
 
