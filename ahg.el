@@ -1575,8 +1575,11 @@ Commands:
                          (or
                           ahg-complete-command-directory-for-filename-completion
                           default-directory)))
-                   (file-expand-wildcards
-                    (concat (substring command idx) "*"))))))
+                   (mapcar
+                    (lambda (n)
+                      (if (file-directory-p n) (file-name-as-directory n) n))
+                    (file-expand-wildcards
+                     (concat (substring command idx) "*")))))))
          (prev (substring command 0 idx)))
     (mapcar (function (lambda (a) (concat prev a))) matches)))
 
