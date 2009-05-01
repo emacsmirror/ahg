@@ -250,7 +250,7 @@ when calling hg. This might not always work."
   "Returns the root of the tree handled by Mercurial, or nil if
 the current dir is not under hg."
   (with-temp-buffer
-    (when (= (call-process ahg-hg-command nil t nil "root") 0)
+    (when (= (ahg-call-process "root") 0)
       (buffer-substring-no-properties (point-min) (1- (point-max))))))
 
 ;;-----------------------------------------------------------------------------
@@ -260,11 +260,12 @@ the current dir is not under hg."
 (defun ahg-identify (&optional root)
   (interactive)
   (with-temp-buffer
-    (let ((status
+    (let* ((args (list "-nibt"))
+           (status
            (if root
                (let ((default-directory (file-name-as-directory root)))
-                 (call-process ahg-hg-command nil t nil "identify" "-nibt"))
-             (call-process ahg-hg-command nil t nil "identify" "-nibt"))))
+                 (ahg-call-process "identify" args))
+             (ahg-call-process "identify" args))))
       (when (= status 0)
         (buffer-substring-no-properties (point-min) (1- (point-max)))))))
 
@@ -1527,7 +1528,7 @@ Commands:
 (defun ahg-complete-command-name (command)
   (with-temp-buffer
     (let ((process-environment (cons "LANG=" process-environment)))
-      (if (= (call-process ahg-hg-command nil t nil "commands") 0)
+      (if (= (ahg-call-process "commands") 0)
           ;; first, we check whether the 'commands' extension is installed
           (let (out)
             (goto-char (point-min))
@@ -1540,7 +1541,7 @@ Commands:
               (forward-line 1))
             (if out (nreverse out) (list command)))
         ;; otherwise, we fall back to calling 'hg help'
-        (if (= (call-process ahg-hg-command nil t nil "help") 0)
+        (if (= (ahg-call-process "help") 0)
             (let (out)
               (goto-char (point-min))
               (search-forward "list of commands:")
@@ -1658,7 +1659,10 @@ that buffer is refreshed instead.)"
                (pop-to-buffer (current-buffer))
                (goto-char (point-min)))
            (ahg-show-error process))))
-     buffer t)))
+     buffer t ;; use-shell
+            nil ;; no-show-message
+            t ;; report-untrusted
+            )))
 
 ;;-----------------------------------------------------------------------------
 ;; hg help
@@ -1712,7 +1716,7 @@ that buffer is refreshed instead.)"
 hg qseries command."
   (with-temp-buffer
     (let ((process-environment (cons "LANG=" process-environment))) 
-      (if (= (call-process ahg-hg-command nil t nil "qseries") 0)
+      (if (= (ahg-call-process "qseries") 0)
           (let (out)
             (goto-char (point-min))
             (while (not (or (looking-at "^$") (eobp)))
@@ -1777,7 +1781,7 @@ only the selected files will be refreshed."
     (if get-log-message
         (let* ((patchname
                 (with-temp-buffer
-                  (when (= (call-process ahg-hg-command nil t nil "qtop") 0)
+                  (when (= (ahg-call-process "qtop") 0)
                     (buffer-substring-no-properties
                      (point-min) (1- (point-max))))))
                (msg (when patchname
@@ -1786,9 +1790,8 @@ only the selected files will be refreshed."
                 (with-temp-buffer
                   (when
                       (= (if patchname
-                             (call-process ahg-hg-command nil t nil
-                                           "qheader" patchname)
-                           (call-process ahg-hg-command nil t nil "qheader")) 0)
+                             (ahg-call-process "qheader" (list patchname))
+                           (ahg-call-process "qheader")) 0)
                     (buffer-substring-no-properties
                      (point-min) (1- (point-max)))))))
           (ahg-log-edit
@@ -1938,7 +1941,7 @@ Pops a buffer for entering the commit message."
   (let* ((buf (generate-new-buffer "*aHg-log*"))
          (patchname
           (with-temp-buffer
-            (when (= (call-process ahg-hg-command nil t nil "qtop") 0)
+            (when (= (ahg-call-process "qtop") 0)
               (buffer-substring-no-properties
                (point-min) (1- (point-max))))))
          (msg (when patchname
@@ -1947,9 +1950,8 @@ Pops a buffer for entering the commit message."
          (content
           (with-temp-buffer
             (when (= (if patchname
-                         (call-process ahg-hg-command nil t nil
-                                       "qheader" patchname)
-                       (call-process ahg-hg-command nil t nil "qheader")) 0)
+                         (ahg-call-process "qheader" (list patchname))
+                       (ahg-call-process "qheader")) 0)
               (buffer-substring-no-properties (point-min) (1- (point-max)))))))
     (ahg-log-edit
      'ahg-mq-convert-patch-to-changeset-callback
@@ -1989,8 +1991,7 @@ last refresh."
   ;; whethe (s)he wants to pop all patches before editing series
   (let* ((some-patches-applied
          (with-temp-buffer
-           (when (= (call-process ahg-hg-command nil t nil "tip"
-                                  "--template" "{tags}") 0)
+           (when (= (ahg-call-process "tip" (list "--template" "{tags}")) 0)
              (let ((tags (split-string (buffer-string))))
                (member "qtip" tags)))))
          (pop (and some-patches-applied
@@ -2292,7 +2293,7 @@ stack of applied patches."
 
 (defun ahg-mq-get-current-patch ()
   (with-temp-buffer
-    (when (= (call-process ahg-hg-command nil t nil "qtop") 0)
+    (when (= (ahg-call-process "qtop") 0)
       (buffer-substring-no-properties (point-min) (1- (point-max))))))
 
 (defun ahg-mq-patches-qrefresh (get-log-message)
@@ -2329,8 +2330,8 @@ so that filename completion works on patch names."
 (defun ahg-first-parent-of-rev (rev)
   (with-temp-buffer
     (let ((process-environment (cons "LANG=" process-environment)))
-      (if (= (call-process ahg-hg-command nil t nil "parents"
-                           "-r" rev "--template" "{rev}") 0)
+      (if (= (ahg-call-process "parents"
+                               (list "-r" rev "--template" "{rev}")) 0)
           (buffer-string)
         (if (string-to-number rev)
             (number-to-string (1- (string-to-number rev)))
@@ -2344,7 +2345,8 @@ so that filename completion works on patch names."
 
 (defun ahg-generic-command (command args sentinel
                                     &optional buffer use-shell
-                                              no-show-message)
+                                              no-show-message
+                                              report-untrusted)
   "Executes then given hg command, with the given
 arguments. SENTINEL is a sentinel function. BUFFER is the
 destination buffer. If nil, a new buffer will be used."
@@ -2358,7 +2360,11 @@ destination buffer. If nil, a new buffer will be used."
     (let ((process
            (apply (if use-shell 'start-process-shell-command 'start-process)
                   (concat "*ahg-command-" command "*") buffer
-                  ahg-hg-command command args)))
+                  ahg-hg-command
+                  (append
+                   (unless report-untrusted
+                     (list "--config" "ui.report_untrusted=0"))
+                   (list command) args))))
       (when ahg-subprocess-coding-system
         (set-process-coding-system process ahg-subprocess-coding-system))
       (set-process-sentinel
@@ -2423,9 +2429,8 @@ Commands:
 
 (defun ahg-uncommitted-changes-p (&optional root)
   (with-temp-buffer
-    (let ((args (if root (list ahg-hg-command nil t nil "-R" root "id" "-n")
-                  (list ahg-hg-command nil t nil "id" "-n"))))
-      (when (= (apply 'call-process args) 0)
+    (let ((global-opts (when root (list "-R" root))))
+      (when (= (ahg-call-process "id" (list "-n") global-opts) 0)
         (= (char-before (1- (point-max))) ?+)))))
 
 (defun ahg-line-point-pos ()
@@ -2436,6 +2441,12 @@ Commands:
   (goto-line (car lp))
   (forward-char (min (cdr lp) (- (point-at-eol) (point-at-bol)))))
 
+
+(defun ahg-call-process (cmd &optional args global-opts)
+  (apply 'call-process (append (list ahg-hg-command nil t nil
+                                     "--config" "ui.report_untrusted=0")
+                               global-opts (list cmd) args)))
+
 ;;-----------------------------------------------------------------------------
 ;; log-edit related functions
 ;;-----------------------------------------------------------------------------
@@ -2444,13 +2455,12 @@ Commands:
   (goto-char (point-max))
   (let ((user
          (with-temp-buffer
-           (if (= (call-process ahg-hg-command nil t nil "showconfig"
-                                "ui.username") 0)
+           (if (= (ahg-call-process "showconfig" (list "ui.username")) 0)
                (buffer-substring-no-properties (point-min) (1- (point-max)))
              "")))
         (branch
          (with-temp-buffer
-           (if (= (call-process ahg-hg-command nil t nil "branch") 0)
+           (if (= (ahg-call-process "branch") 0)
                (buffer-substring-no-properties (point-min) (1- (point-max)))
              "")))
         (changed (log-edit-files))
