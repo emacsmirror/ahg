@@ -2455,12 +2455,16 @@ Commands:
   (goto-char (point-max))
   (let ((user
          (with-temp-buffer
-           (if (= (ahg-call-process "showconfig" (list "ui.username")) 0)
+           (if (and
+                (= (ahg-call-process "showconfig" (list "ui.username")) 0)
+                (> (point-max) (point-min)))
                (buffer-substring-no-properties (point-min) (1- (point-max)))
              "")))
         (branch
          (with-temp-buffer
-           (if (= (ahg-call-process "branch") 0)
+           (if (and
+                (= (ahg-call-process "branch") 0)
+                (> (point-max) (point-min)))
                (buffer-substring-no-properties (point-min) (1- (point-max)))
              "")))
         (changed (log-edit-files))
