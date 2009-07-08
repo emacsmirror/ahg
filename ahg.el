@@ -518,6 +518,7 @@ the singleton list with the node at point."
                  (with-current-buffer
                      (process-buffer process)
                    (ahg-status-maybe-refresh aroot)
+                   (kill-buffer nil)
                    (message "Added %d files" howmany))
                (ahg-show-error process)))))
       (message "hg add aborted"))))
@@ -537,6 +538,7 @@ the singleton list with the node at point."
              (if (string= status "finished\n")
                  (with-current-buffer (process-buffer process)
                    (ahg-status-maybe-refresh aroot)
+                   (kill-buffer nil)
                    (message "Removed %d files" howmany))
                (ahg-show-error process)))))
       (message "hg remove aborted"))))
@@ -558,6 +560,7 @@ the singleton list with the node at point."
                  (with-current-buffer
                      (process-buffer process)
                    (ahg-status-maybe-refresh aroot)
+                   (kill-buffer nil)
                    (message "Added/Removed %d files" howmany))
                (ahg-show-error process)))))
       (message "hg addremove aborted"))))
@@ -628,7 +631,8 @@ the file on the current line."
              (if (string= status "finished\n")
                  (with-current-buffer
                      (process-buffer process)
-                   (ahg-status-maybe-refresh aroot))
+                   (ahg-status-maybe-refresh aroot)
+                   (kill-buffer nil))
                (ahg-show-error process)))))
       (message "hg revert aborted"))))                         
 
