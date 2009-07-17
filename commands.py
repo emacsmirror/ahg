@@ -19,6 +19,13 @@ from mercurial import util
 from mercurial.i18n import _
 
 
+try: set
+except NameError: set = util.set
+
+try: sorted
+except NameError: sorted = util.sort
+
+
 def list_commands(ui, repo, **opts):
     """\
 print the list of available commands
@@ -27,7 +34,7 @@ print the list of available commands
     debug = not short and opts['debuglist']
     noalias = opts['no_alias']
     noext = short or opts['no_ext']
-    cmds = util.set()
+    cmds = set()
     # walk through the main cmdtable
     def process(cmdtable):
         for n in cmdtable:
@@ -47,7 +54,7 @@ print the list of available commands
         for name, ext in hgext.extensions():
             process(ext.cmdtable)
     # ok, now sort the list and print it
-    for cmd in util.sort(cmds):
+    for cmd in sorted(cmds):
         ui.write(cmd + '\n')
 
 hgcmd.optionalrepo += " commands"
