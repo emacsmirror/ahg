@@ -1613,7 +1613,7 @@ that buffer is refreshed instead.)"
                     'minibuffer-complete)
                   (completing-read ahg-do-command-prompt
                                    (dynamic-completion-table
-                                    ahg-complete-command)))))
+                                    'ahg-complete-command)))))
   (let* ((args (split-string cmdstring " "))
          (cmdname (car args))
          (cmdargs (mapconcat 'identity (cdr args) " "))
@@ -1676,7 +1676,7 @@ that buffer is refreshed instead.)"
   (interactive
    (list (completing-read "Help on hg command: "
                           (dynamic-completion-table
-                           ahg-complete-command-name))))
+                           'ahg-complete-command-name))))
   (let ((buffer (get-buffer-create "*hg help*")))
     (with-current-buffer buffer (let ((inhibit-read-only t)) (erase-buffer)))
     (ahg-generic-command
@@ -1820,8 +1820,9 @@ FORCE is non-nil, discard local changes (passing -f to hg). When
 called interactively, PATCHNAME and FORCE are read from the minibuffer.
 "
   (interactive
-   (list (completing-read "Go to patch: "
-                          (dynamic-completion-table ahg-complete-mq-patch-name))
+   (list (completing-read
+          "Go to patch: "
+          (dynamic-completion-table 'ahg-complete-mq-patch-name))
          (and (ahg-uncommitted-changes-p)
               (ahg-y-or-n-p "Overwrite local changes? "))))
   (let ((args (if force (list "-f" patchname) (list patchname))))
@@ -1897,7 +1898,7 @@ read the name from the minibuffer."
   (interactive
    (list
     (completing-read "Delete patch: "
-                     (dynamic-completion-table ahg-complete-mq-patch-name))))
+                     (dynamic-completion-table 'ahg-complete-mq-patch-name))))
   (ahg-generic-command
    "qdelete" (list patchname)
    (lexical-let ((patchname patchname)
