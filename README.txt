@@ -29,6 +29,14 @@ Download
 An hg repository can be found at http://bitbucket.org/agriggio/ahg/
 
 
+Requirements
+------------
+
+- Emacs version 22 or higher
+- Mercurial version 1.0 or higher (it might work with older versions, but I
+  haven't tested it)
+
+
 Installation
 ------------
 
