@@ -1532,8 +1532,8 @@ Commands:
 (defun ahg-complete-command-name (command)
   (with-temp-buffer
     (let ((process-environment (cons "LANG=" process-environment)))
-      (if (= (ahg-call-process "commands") 0)
-          ;; first, we check whether the 'commands' extension is installed
+      (if (= (ahg-call-process "debugcomplete") 0)
+          ;; first, we try the built-in autocompletion of mercurial
           (let (out)
             (goto-char (point-min))
             (while (not (eobp))
@@ -1544,27 +1544,8 @@ Commands:
                      out))
               (forward-line 1))
             (if out (nreverse out) (list command)))
-        ;; otherwise, we fall back to calling 'hg help'
-        (if (= (ahg-call-process "help") 0)
-            (let (out)
-              (goto-char (point-min))
-              (search-forward "list of commands:")
-              (beginning-of-line)
-              (forward-line 2)
-              (while (not (or (looking-at "^$") (eobp)))
-                (forward-char 1)
-                (let* ((pt (point))
-                       (cmd (buffer-substring-no-properties
-                             pt (progn (forward-word) (point))))
-                       (ok (compare-strings command 0 nil cmd 0 nil)))
-                  (when (or (eq ok t) (= (- ok) (1+ (length command))))
-                    (setq out (cons cmd out)))
-                  (beginning-of-line)
-                  (forward-line 1)))
-              (if out (nreverse out) (list command)))
-          ;; here, we silently ignore errors, and return the command itself as a
-          ;; match
-          (list command))))))
+        ;; if this fails, we return the string itself as a match
+        (list command)))))
 
 (defvar ahg-complete-command-directory-for-filename-completion nil)
 
