@@ -1612,8 +1612,8 @@ that buffer is refreshed instead.)"
                   (define-key minibuffer-local-completion-map "\t"
                     'minibuffer-complete)
                   (completing-read ahg-do-command-prompt
-                                   (dynamic-completion-table
-                                    'ahg-complete-command)))))
+                                   (ahg-dynamic-completion-table
+                                    ahg-complete-command)))))
   (let* ((args (split-string cmdstring " "))
          (cmdname (car args))
          (cmdargs (mapconcat 'identity (cdr args) " "))
@@ -1675,8 +1675,8 @@ that buffer is refreshed instead.)"
 (defun ahg-command-help (command)
   (interactive
    (list (completing-read "Help on hg command: "
-                          (dynamic-completion-table
-                           'ahg-complete-command-name))))
+                          (ahg-dynamic-completion-table
+                           ahg-complete-command-name))))
   (let ((buffer (get-buffer-create "*hg help*")))
     (with-current-buffer buffer (let ((inhibit-read-only t)) (erase-buffer)))
     (ahg-generic-command
@@ -1822,7 +1822,7 @@ called interactively, PATCHNAME and FORCE are read from the minibuffer.
   (interactive
    (list (completing-read
           "Go to patch: "
-          (dynamic-completion-table 'ahg-complete-mq-patch-name))
+          (ahg-dynamic-completion-table ahg-complete-mq-patch-name))
          (and (ahg-uncommitted-changes-p)
               (ahg-y-or-n-p "Overwrite local changes? "))))
   (let ((args (if force (list "-f" patchname) (list patchname))))
@@ -1897,8 +1897,9 @@ read from the minibuffer.
 read the name from the minibuffer."
   (interactive
    (list
-    (completing-read "Delete patch: "
-                     (dynamic-completion-table 'ahg-complete-mq-patch-name))))
+    (completing-read
+     "Delete patch: "
+     (ahg-dynamic-completion-table ahg-complete-mq-patch-name))))
   (ahg-generic-command
    "qdelete" (list patchname)
    (lexical-let ((patchname patchname)
@@ -2451,6 +2452,11 @@ Commands:
   (apply 'call-process (append (list ahg-hg-command nil t nil
                                      "--config" "ui.report_untrusted=0")
                                global-opts (list cmd) args)))
+
+(defmacro ahg-dynamic-completion-table (fun)
+  (if (fboundp 'completion-table-dynamic)
+      `(completion-table-dynamic (quote ,fun))
+    `(dynamic-completion-table ,fun)))
 
 ;;-----------------------------------------------------------------------------
 ;; log-edit related functions
