@@ -1667,6 +1667,12 @@ that buffer is refreshed instead.)"
            (progn
              (pop-to-buffer (process-buffer process))
              (help-mode)
+             (local-set-key "!" 'ahg-do-command)
+             (let ((mymap (copy-keymap
+                           (cdr (assq 'view-mode minor-mode-map-alist)))))
+               (define-key mymap "h" 'ahg-command-help)
+               (add-to-list 'minor-mode-overriding-map-alist
+                            (cons 'view-mode mymap)))
              (goto-char (point-min)))
          (ahg-show-error process)))
      buffer)))
