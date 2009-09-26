@@ -325,6 +325,7 @@ Commands:
   (define-key ahg-status-mode-map "\r" 'ahg-status-visit-file)
   (define-key ahg-status-mode-map "o" 'ahg-status-visit-file-other-window)
   (define-key ahg-status-mode-map "h" 'ahg-command-help)
+  (define-key ahg-status-mode-map "$" 'ahg-status-shell-command)
   (let ((showmap (make-sparse-keymap)))
     (define-key showmap "A" 'ahg-status-show-all)
     (define-key showmap "m" 'ahg-status-show-modified)
@@ -361,6 +362,7 @@ Commands:
     ["Add/Remove" ahg-status-addremove [:keys "A" :active t]]
     ["Undo" ahg-status-undo [:keys "U" :active t]]
     ["Hg Command" ahg-status-do-command [:keys "!" :active t]]
+    ["Shell Command" ahg-status-shell-command [:keys "$" :active t]]
     ["--" nil nil]
     ["Toggle Mark" ahg-status-toggle-mark [:keys " " :active t]]
     ["Mark" ahg-status-mark [:keys "m" :active t]]
@@ -739,6 +741,33 @@ ahg-status, and it has an ewoc associated with it."
   (let* ((files (ahg-status-get-marked nil))
          (ahg-file-list-for-log-command (if files (mapcar 'cddr files) nil)))
     (call-interactively 'ahg-glog)))
+
+
+(defun ahg-status-shell-command (command files refresh)
+  "Run a shell command COMMAND on the marked files.
+If there are no marked files, run COMMAND on the file at point.
+This function uses `dired-do-shell-command' to do the work, and
+so it supports the special meaning of `*' and `?' in COMMAND.
+See the help for `dired-do-shell-command' for details.
+If REFRESH is non-nil, refresh the status buffer after executing COMMAND.
+When called interactively, REFRESH is non-nil if a prefix argument is given."
+  (interactive
+   (let ((fnames (ahg-status-get-marked 'cur)))
+     (list
+      (let ((minibuffer-local-completion-map
+             (copy-keymap minibuffer-local-map)))
+        (define-key minibuffer-local-completion-map "\t"
+          'minibuffer-complete)
+        (completing-read
+         (apply 'format "Shell command on %s file%s: "
+                (if (and (= (length fnames) 1) (null (caar fnames)))
+                    (list "current" (format " (%s)" (cddar fnames)))
+                  '("selected" "s")))
+         (ahg-dynamic-completion-table ahg-complete-shell-command)))
+      (mapcar 'cddr fnames)
+      current-prefix-arg)))
+  (dired-do-shell-command command nil files)
+  (when refresh (ahg-status-refresh)))
 
 ;;-----------------------------------------------------------------------------
 ;; hg commit
@@ -2444,6 +2473,14 @@ Commands:
   (if (fboundp 'completion-table-dynamic)
       `(completion-table-dynamic (quote ,fun))
     `(dynamic-completion-table ,fun)))
+
+
+(defun ahg-complete-shell-command (command)
+  ;; we split the string, and treat the last word as a filename
+  (let* ((idx (string-match "\\([^ ]+\\)$" command))
+         (matches (file-expand-wildcards (concat (substring command idx) "*")))
+         (prev (substring command 0 idx)))
+    (mapcar (function (lambda (a) (concat prev a))) matches)))
 
 ;;-----------------------------------------------------------------------------
 ;; log-edit related functions
