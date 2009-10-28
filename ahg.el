@@ -326,6 +326,7 @@ Commands:
   (define-key ahg-status-mode-map "o" 'ahg-status-visit-file-other-window)
   (define-key ahg-status-mode-map "h" 'ahg-command-help)
   (define-key ahg-status-mode-map "$" 'ahg-status-shell-command)
+  (define-key ahg-status-mode-map "F" 'ahg-status-dired-find)
   (let ((showmap (make-sparse-keymap)))
     (define-key showmap "A" 'ahg-status-show-all)
     (define-key showmap "m" 'ahg-status-show-modified)
@@ -368,6 +369,7 @@ Commands:
     ["Mark" ahg-status-mark [:keys "m" :active t]]
     ["Unmark" ahg-status-unmark [:keys "u" :active t]]
     ["Unmark All" ahg-status-unmark-all [:keys (kbd "M-DEL") :active t]]
+    ["Show Marked in Dired" ahg-status-dired-find [:keys "F" :active t]]
     ["--" nil nil]
     ["Log Summary" ahg-short-log [:keys "l" :active t]]
     ["Detailed Log" ahg-log [:keys "L" :active t]]
@@ -768,6 +770,20 @@ When called interactively, REFRESH is non-nil if a prefix argument is given."
       current-prefix-arg)))
   (dired-do-shell-command command nil files)
   (when refresh (ahg-status-refresh)))
+
+
+(defun ahg-status-dired-find (files)
+  "Show the highlighted files in a dired buffer.
+Uses find-dired to get them into nicely."
+  (interactive (list (ahg-status-get-marked 'cur)))
+  (find-dired
+   default-directory
+   (concat
+    (mapconcat
+     (lambda (f)
+       (concat "-path \"*/" (cddr f) "\" -or"))
+     files " ")
+    " -false")))
 
 ;;-----------------------------------------------------------------------------
 ;; hg commit
