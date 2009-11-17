@@ -2205,8 +2205,10 @@ about which are currently applied."
   (unless root (setq root (ahg-root)))
   (let ((buf (ahg-mq-get-patches-buffer root))
         (msg (when (interactive-p)
-               (format "aHg: getting patch queue for %s..." root))))
+               (format "aHg: getting patch queue for %s..." root)))
+        (oldcolumns (getenv "COLUMNS")))
     (when msg (message msg))
+    (setenv "COLUMNS" "100000")
     (ahg-generic-command
      "qseries" nil
      (lexical-let ((buf buf)
@@ -2270,7 +2272,10 @@ about which are currently applied."
            ;; error in hg qseries
            (kill-buffer buf)
            (ahg-show-error process))))
-     nil nil t)))
+     nil nil t)
+    ;; restore the COLUMNS env var
+    (setenv "COLUMNS" oldcolumns)
+    ))
 
 
 (defun ahg-mq-patch-list-refresh ()
