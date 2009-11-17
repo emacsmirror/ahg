@@ -267,7 +267,18 @@ the current dir is not under hg."
                  (ahg-call-process "identify" args))
              (ahg-call-process "identify" args))))
       (when (= status 0)
-        (buffer-substring-no-properties (point-min) (1- (point-max)))))))
+        (concat
+         "Id: "
+         (buffer-substring-no-properties (point-min) (1- (point-max))))))))
+
+(defun ahg-summary-info (root)
+  (with-temp-buffer
+    (let ((status (let ((default-directory (file-name-as-directory root)))
+                    (ahg-call-process "summary" nil))))
+      (if (= status 0)
+          (buffer-substring-no-properties (point-min) (1- (point-max)))
+        ;; if hg summary is not available, fall back to hg identify
+        (ahg-identify root)))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg status
@@ -651,7 +662,7 @@ ahg-status, and it has an ewoc associated with it."
                  (propertize root 'face ahg-header-line-root-face) "\n"))
         (footer (concat "\n"
                         (make-string (1- (window-width (selected-window))) ?-)
-                        "\nId: " (ahg-identify root))))
+                        "\n" (ahg-summary-info root))))
     (with-current-buffer buf
       (erase-buffer)
       (let ((ew (ewoc-create 'ahg-status-pp
