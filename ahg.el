@@ -2223,6 +2223,7 @@ about which are currently applied."
                     (with-current-buffer (process-buffer process)
                       (split-string (buffer-string) "\n"))))
                (kill-buffer (process-buffer process))
+               (setenv "COLUMNS" "100000")
                (ahg-generic-command
                 "qapplied" nil
                 (lexical-let ((buf buf)
