@@ -778,7 +778,8 @@ When called interactively, REFRESH is non-nil if a prefix argument is given."
                   '("selected" "s")))
          (ahg-dynamic-completion-table ahg-complete-shell-command)))
       (mapcar 'cddr fnames)
-      current-prefix-arg)))
+      (if ahg-auto-refresh-status-buffer
+          (not current-prefix-arg) current-prefix-arg))))
   (dired-do-shell-command command nil files)
   (when refresh (ahg-status-refresh)))
 
