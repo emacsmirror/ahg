@@ -1535,6 +1535,22 @@ Commands:
 \\{ahg-diff-mode-map}
 "
   (toggle-read-only t)
+  (save-excursion
+    (goto-char (point-min))
+    (forward-line 1)
+    (let ((fs (or (diff-hunk-file-names) (diff-hunk-file-names t)))
+          goodpath)
+      (when fs
+        (dolist (p fs goodpath)
+          (unless goodpath
+            (when (string-match "^\\(a\\|b\\)/" p)
+              (setq goodpath (substring p (match-end 0))))))
+        (when goodpath
+          (let ((hint (concat (ahg-root) "/" goodpath)))
+            (set (make-local-variable 'diff-remembered-defdir)
+                 default-directory)
+            (diff-tell-file-name nil hint)))
+        )))
   (define-key ahg-diff-mode-map "q" 'ahg-buffer-quit)
   (easy-menu-add-item nil '("Diff") '["--" nil nil])
   (easy-menu-add-item nil '("Diff") '["Quit" ahg-buffer-quit
