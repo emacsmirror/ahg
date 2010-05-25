@@ -1731,8 +1731,10 @@ that buffer is refreshed instead.)"
    (list (completing-read "Help on hg command: "
                           (ahg-dynamic-completion-table
                            ahg-complete-command-name))))
-  (let ((buffer (get-buffer-create "*hg help*")))
+  (let ((buffer (get-buffer-create "*hg help*"))
+        (oldcols (getenv "COLUMNS")))
     (with-current-buffer buffer (let ((inhibit-read-only t)) (erase-buffer)))
+    (setenv "COLUMNS" (format "%s" (window-width (selected-window))))
     (ahg-generic-command
      "help" (list command)
      (lambda (process status)
@@ -1748,7 +1750,8 @@ that buffer is refreshed instead.)"
                             (cons 'view-mode mymap)))
              (goto-char (point-min)))
          (ahg-show-error process)))
-     buffer)))
+     buffer)
+    (setenv "COLUMNS" oldcols)))
 
 ;;-----------------------------------------------------------------------------
 ;; MQ support
