@@ -1538,7 +1538,7 @@ Commands:
   (toggle-read-only t)
   (save-excursion
     (goto-char (point-min))
-    (forward-line 1)
+    (while (or (not (looking-at "^---")) (eobp)) (forward-line 1))
     (let ((fs (or (diff-hunk-file-names) (diff-hunk-file-names t)))
           goodpath)
       (when fs
