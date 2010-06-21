@@ -957,7 +957,8 @@ Commands:
                     (make-string (- width (length s)) ? )
                   "")))
       (insert (propertize (concat s pad) 'mouse-face 'highlight
-                          'keymap ahg-short-log-line-map)))))
+                          'keymap ahg-short-log-line-map
+                          'help-echo p4)))))
         
 (defun ahg-short-log-insert-contents (ewoc contents)
   (let ((lines (split-string contents "\n")))
