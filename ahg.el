@@ -28,6 +28,7 @@
 (require 'log-edit)
 (require 'ewoc)
 (require 'cl)
+(require 'grep)
 
 ;;-----------------------------------------------------------------------------
 ;; ahg-version
@@ -53,6 +54,7 @@
                       ["Commit Current File" ahg-commit-cur-file t]
                       ["View Changes of Current File" ahg-diff-cur-file t]
                       ["View Change Log of Current File" ahg-log-cur-file t]
+                      ["Grep the Working Directory" ahg-manifest-grep t]
                       ["--" nil nil]
                       ("Mercurial Queues"
                        ["New Patch" ahg-qnew t]
@@ -82,6 +84,7 @@
     (define-key map "h" 'ahg-command-help)
     (define-key map "c" 'ahg-commit-cur-file)
     (define-key map "=" 'ahg-diff-cur-file)
+    (define-key map "f" 'ahg-manifest-grep)
     (define-key map (kbd "C-l") 'ahg-log-cur-file)
     (define-key map "Q"
       (let ((qmap (make-sparse-keymap)))
@@ -1753,6 +1756,35 @@ that buffer is refreshed instead.)"
          (ahg-show-error process)))
      buffer)
     (setenv "COLUMNS" oldcols)))
+
+;;-----------------------------------------------------------------------------
+;; manifest grep
+;;-----------------------------------------------------------------------------
+
+(defvar ahg-manifest-grep-pattern-history nil
+  "History for patterns of `ahg-manifest-grep-'.")
+
+(defun ahg-manifest-grep (pattern)
+  "Search for grep-like pattern in the working directory, considering only
+the files under version control."
+  (interactive
+   (list
+    (let* ((default
+             (cond ((and mark-active transient-mark-mode)
+                    (regexp-quote (buffer-substring (region-beginning)
+                                                    (region-end))))
+                   ((symbol-at-point)
+                    (regexp-quote (format "%s" (symbol-at-point))))
+                   (t (car ahg-manifest-grep-pattern-history))))
+           (input (read-string
+                   (if default
+                       (format "Search for pattern (default %s): "
+                               (query-replace-descr default))
+                     "Search for pattern: "))))
+      (if (and input (> (length input) 0)) input default))))
+  (grep (format "cd %s && %s manifest | xargs grep -nH -E '%s'"
+                (ahg-root) ahg-hg-command
+                (shell-quote-argument pattern))))
 
 ;;-----------------------------------------------------------------------------
 ;; MQ support
