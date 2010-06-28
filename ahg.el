@@ -1937,8 +1937,10 @@ called interactively, PATCHNAME and FORCE are read from the minibuffer.
                         (beginning-of-line)
                         (buffer-substring-no-properties
                          (point-at-bol) (point-at-eol)))))
-                 (message msg))
-               (kill-buffer (process-buffer process)))
+                 (message msg)
+                 (if (string-match-p "^errors " msg)
+                     (ahg-show-error process)
+                   (kill-buffer (process-buffer process)))))
            (ahg-show-error process)))))))
 
 (defun ahg-qpop-all (force)
