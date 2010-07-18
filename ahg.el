@@ -2433,6 +2433,7 @@ so that filename completion works on patch names."
          (concat (file-name-as-directory (ahg-root)) ".hg/patches/")))
     (call-interactively 'ahg-do-command)))
 
+
 ;;-----------------------------------------------------------------------------
 ;; Various helper functions
 ;;-----------------------------------------------------------------------------
@@ -2441,8 +2442,8 @@ so that filename completion works on patch names."
   (with-temp-buffer
     (let ((process-environment (cons "LANG=" process-environment)))
       (if (= (ahg-call-process "parents"
-                               (list "-r" rev "--template" "{rev}")) 0)
-          (buffer-string)
+                               (list "-r" rev "--template" "{rev} ")) 0)
+          (car (split-string (buffer-string)))
         (if (string-to-number rev)
             (number-to-string (1- (string-to-number rev)))
           0)))))
