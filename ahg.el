@@ -2553,6 +2553,9 @@ so that filename completion works on patch names."
 
 
 (defun ahg-record (selected-files)
+  "Interactively select which changes to commit. Similar in
+spirit to the crecord hg extension, but using the patch editing
+functionalities provided by Emacs."
   (interactive
    (list (when (eq major-mode 'ahg-status-mode) 
            (mapcar 'cddr
@@ -2681,6 +2684,9 @@ so that filename completion works on patch names."
 
 
 (defun ahg-record-qnew (patchname selected-files)
+  "Interactively select which changes to include in the new mq patch PATCHNAME.
+Similar in spirit to the crecord hg extension, but using the
+patch editing functionalities provided by Emacs."
   (interactive
    (list (read-string "Patch name: ")
          (when (eq major-mode 'ahg-status-mode)
