@@ -2503,6 +2503,15 @@ destination buffer. If nil, a new buffer will be used."
     (message "aHg command exited with non-zero status: %s"
              (mapconcat 'identity (process-command process) " "))))
 
+(defun ahg-show-error-msg (msg &optional buf)
+  "Displays an error message for the given process."
+  (when buf
+    (pop-to-buffer buf))
+  (goto-char (point-max))
+  (ahg-command-mode)
+  (let ((inhibit-read-only t))
+    (insert msg "\n")))
+
 (define-derived-mode ahg-command-mode nil "aHg command"
   "Major mode for aHg commands.
 
