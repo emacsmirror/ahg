@@ -363,6 +363,12 @@ Commands:
     (define-key qmap "l" 'ahg-mq-list-patches)
     (define-key qmap "e" 'ahg-mq-edit-series)
     (define-key ahg-status-mode-map "Q" qmap))
+  (let ((imap (make-sparse-keymap)))
+    (define-key imap "c" 'ahg-record)
+    (let ((iqmap (make-sparse-keymap)))
+      (define-key iqmap "n" 'ahg-record-qnew)
+      (define-key imap "Q" iqmap))
+    (define-key ahg-status-mode-map "i" imap))
   (easy-menu-add ahg-status-mode-menu ahg-status-mode-map))
 
 (easy-menu-define ahg-status-mode-menu ahg-status-mode-map "aHg Status"
@@ -372,6 +378,7 @@ Commands:
      [:keys "o" :active t]]
     ["--" nil nil]
     ["Commit" ahg-status-commit [:keys "c" :active t]]
+    ["Interactive Commit (Record)" ahg-record [:keys "ic" :active t]]
     ["Add" ahg-status-add [:keys "a" :active t]]
     ["Remove" ahg-status-remove [:keys "r" :active t]]
     ["Add/Remove" ahg-status-addremove [:keys "A" :active t]]
@@ -404,6 +411,7 @@ Commands:
     ["--" nil nil]
     ("Mercurial Queues"
      ["New Patch" ahg-qnew [:keys "Qn" :active t]]
+     ["New Interactive Patch" ahg-record-qnew [:keys "iQn" :active t]]
      ["View Qdiff" ahg-qdiff [:keys "Q=" :active t]]
      ["Refresh Current Patch" ahg-qrefresh [:keys "Qr" :active t]]
      ["Go to Patch..." ahg-qgoto [:keys "Qg" :active t]]
