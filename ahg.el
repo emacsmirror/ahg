@@ -154,6 +154,11 @@ when calling hg. This might not always work."
   "If non-nil, coding system used when reading output of hg commands."
   :group 'ahg :type 'symbol)
 
+(defcustom ahg-log-revrange-size 100
+  "Length of default revision range for `ahg-log',
+`ahg-short-log' and `ahg-glog'."
+  :group 'ahg :type 'integer)
+
 (defface ahg-status-marked-face
   '((default (:inherit font-lock-preprocessor-face)))
   "Face for marked files in aHg status buffers." :group 'ahg)
@@ -1090,7 +1095,7 @@ do nothing."
                 (read-string
                  (concat "hg log"
                          (if is-on-selected-files " (on selected files)" "")
-                         ", R2: ") (cdr ahg-log-default-revisions)))
+                         ", R2: ") (ahg-log-revrange-end)))
           (when read-extra-flags
             (list (read-string
                    (concat "hg log"
@@ -1099,6 +1104,15 @@ do nothing."
     ;; remember the values entered for the next call
     (setq ahg-log-default-revisions (cons (car retval) (cadr retval)))
     retval))
+
+(defun ahg-log-revrange-end ()
+  (with-temp-buffer
+    (if (= (ahg-call-process "id" (list "-n")) 0)
+        (let ((n (string-to-number (buffer-string))))
+          (if (> n ahg-log-revrange-size)
+              (format "-%s" ahg-log-revrange-size)
+            "0"))
+      "0")))
 
 
 (defun ahg-short-log-create-ewoc ()
