@@ -1563,7 +1563,7 @@ Commands:
   (toggle-read-only t)
   (save-excursion
     (goto-char (point-min))
-    (while (or (not (looking-at "^---")) (eobp)) (forward-line 1))
+    (while (and (not (eobp)) (not (looking-at "^---"))) (forward-line 1))
     (let ((fs (or (diff-hunk-file-names) (diff-hunk-file-names t)))
           goodpath)
       (when fs
@@ -2522,7 +2522,7 @@ so that filename completion works on patch names."
                        ;; if there are binary files, abort
                        (save-excursion
                          (while (not (eobp))
-                           (re-search-forward "^diff --git [^\n]*$" nil t)
+                           (re-search-forward "^diff --git [^\n]*$" nil 1)
                            (forward-line 2)
                            (beginning-of-line)
                            (if (looking-at "^GIT binary patch$")
