@@ -2462,6 +2462,7 @@ so that filename completion works on patch names."
 
 (defun ahg-record-setup (root selected-files)
   (setq root (file-name-as-directory root))
+  ;;(message "ROOT IS: %s" root)
   (let* ((backup (concat root ".hg/ahg-record-backup"))
          (curpatch (concat root ".hg/ahg-record-patch"))
          (isthere (or (file-exists-p backup) (file-symlink-p backup)))
@@ -2510,6 +2511,7 @@ so that filename completion works on patch names."
                                (let ((kill-whole-line t))
                                  (kill-line))))
                          ;; otherwise, let's call hg diff again
+                         (cd root)
                          (unless (= (ahg-call-process
                                      "diff"
                                      (append (list "--git") selected-files)
@@ -2839,9 +2841,11 @@ Commands:
 
 
 (defun ahg-call-process (cmd &optional args global-opts)
-  (apply 'call-process (append (list ahg-hg-command nil t nil
-                                     "--config" "ui.report_untrusted=0")
-                               global-opts (list cmd) args)))
+  (let ((callargs (append (list ahg-hg-command nil t nil
+                                "--config" "ui.report_untrusted=0")
+                          global-opts (list cmd) args)))
+    ;;(message "callargs: %s" callargs)
+    (apply 'call-process callargs)))
 
 (defmacro ahg-dynamic-completion-table (fun)
   (if (fboundp 'completion-table-dynamic)
