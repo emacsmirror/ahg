@@ -127,6 +127,11 @@ command output." :group 'ahg :type 'boolean)
 command output, instead of waiting for the command to finish."
   :group 'ahg :type 'boolean)
 
+(defcustom ahg-do-command-interactive-regexp "^in\\|incoming\\|out\\|outgoing\\|pull\\|push$"
+  "Regexp for commands that might require a username/password
+input in `ahg-do-command'."
+  :group 'ahg :type 'regexp)
+
 (defcustom ahg-auto-refresh-status-buffer t
   "If non-nil, automatically refresh the *aHg status* buffer when certain
 operations (e.g. add, remove, commit) are performed."
@@ -1701,7 +1706,10 @@ that buffer is refreshed instead.)"
          (buffer (get-buffer-create (concat "*hg command: "
                                             (ahg-root) "*")))
          (curdir default-directory)
-         (should-refresh current-prefix-arg))
+         (should-refresh current-prefix-arg)
+         (is-interactive
+          (string-match-p ahg-do-command-interactive-regexp cmdname))
+         (ahg-i18n (if is-interactive nil ahg-i18n)))
     (when ahg-do-command-extra-args
       (let ((extra (mapconcat 'identity ahg-do-command-extra-args " ")))
         (setq cmdargs
@@ -1743,10 +1751,46 @@ that buffer is refreshed instead.)"
                (pop-to-buffer (current-buffer))
                (goto-char (point-min)))
            (ahg-show-error process))))
-     buffer t ;; use-shell
-            nil ;; no-show-message
-            t ;; report-untrusted
-            )))
+     buffer
+     t ;; use-shell
+     nil ;; no-show-message
+     t ;; report-untrusted
+     (when is-interactive 'ahg-do-command-filter) ;; filterfunc
+     is-interactive ;; is-interactive
+     )))
+
+
+(defun ahg-do-command-filter (process string)
+  (when (buffer-name (process-buffer process))
+    ;; insert output into the buffer
+    (with-current-buffer (process-buffer process)
+      (let ((moving (= (point) (process-mark process)))
+            (inhibit-read-only t))
+        (save-excursion
+          ;; Insert the text, advancing the process marker.
+          (goto-char (process-mark process))
+          (insert string)
+          (set-marker (process-mark process) (point))
+          ;; check if we are expecting a user name or a password
+          (let (user pass data)
+            (save-excursion
+              (backward-word)
+              (cond ((looking-at "\\<user: $") (setq user t))
+                    ((looking-at "\\<password: $") (setq pass t))))
+            (cond (user (setq data (concat (read-string "user: ") "\n"))
+                        (process-send-string process data))
+                  (pass (setq data (concat (read-passwd "password: ") "\n"))
+                        (process-send-string process data)
+                        (setq data
+                              (concat (make-string (1- (length data)) ?.) "\n"))
+                        ))
+            (when data
+              (insert data)
+              (set-marker (process-mark process) (point)))
+            )
+          )
+        (if moving (goto-char (process-mark process)))))))
+  
 
 ;;-----------------------------------------------------------------------------
 ;; hg help
@@ -2734,7 +2778,9 @@ patch editing functionalities provided by Emacs."
 (defun ahg-generic-command (command args sentinel
                                     &optional buffer use-shell
                                               no-show-message
-                                              report-untrusted)
+                                              report-untrusted
+                                              filterfunc
+                                              is-interactive)
   "Executes then given hg command, with the given
 arguments. SENTINEL is a sentinel function. BUFFER is the
 destination buffer. If nil, a new buffer will be used."
@@ -2752,6 +2798,8 @@ destination buffer. If nil, a new buffer will be used."
                   (append
                    (unless report-untrusted
                      (list "--config" "ui.report_untrusted=0"))
+                   (when is-interactive
+                     (list "--config" "ui.interactive=1"))
                    (list command) args))))
       (when ahg-subprocess-coding-system
         (set-process-coding-system process ahg-subprocess-coding-system))
@@ -2766,6 +2814,7 @@ destination buffer. If nil, a new buffer will be used."
                       cmd))
            (setq mode-line-process nil)
            (funcall sf p s))))
+      (set-process-filter process filterfunc)
       )
     (setenv "HGPLAIN")
     (setenv "LANG" lang)
