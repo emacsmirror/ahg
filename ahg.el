@@ -127,7 +127,7 @@ command output." :group 'ahg :type 'boolean)
 command output, instead of waiting for the command to finish."
   :group 'ahg :type 'boolean)
 
-(defcustom ahg-do-command-interactive-regexp "^in\\|incoming\\|out\\|outgoing\\|pull\\|push$"
+(defcustom ahg-do-command-interactive-regexp "\\<\\(in\\|incoming\\|out\\|outgoing\\|pull\\|push\\)\\>"
   "Regexp for commands that might require a username/password
 input in `ahg-do-command'."
   :group 'ahg :type 'regexp)
