@@ -1781,8 +1781,7 @@ that buffer is refreshed instead.)"
                         (process-send-string process data))
                   (pass (setq data (concat (read-passwd "password: ") "\n"))
                         (process-send-string process data)
-                        (setq data
-                              (concat (make-string (1- (length data)) ?.) "\n"))
+                        (setq data "***\n")
                         ))
             (when data
               (insert data)
