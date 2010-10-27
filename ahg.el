@@ -1708,7 +1708,7 @@ that buffer is refreshed instead.)"
          (curdir default-directory)
          (should-refresh current-prefix-arg)
          (is-interactive
-          (string-match-p ahg-do-command-interactive-regexp cmdname))
+          (ahg-string-match-p ahg-do-command-interactive-regexp cmdname))
          (ahg-i18n (if is-interactive nil ahg-i18n)))
     (when ahg-do-command-extra-args
       (let ((extra (mapconcat 'identity ahg-do-command-extra-args " ")))
@@ -2004,7 +2004,7 @@ called interactively, PATCHNAME and FORCE are read from the minibuffer.
                         (buffer-substring-no-properties
                          (point-at-bol) (point-at-eol)))))
                  (message msg)
-                 (if (string-match-p "^errors " msg)
+                 (if (ahg-string-match-p "^errors " msg)
                      (ahg-show-error process)
                    (kill-buffer (process-buffer process)))))
            (ahg-show-error process)))))))
@@ -2908,6 +2908,12 @@ Commands:
          (matches (file-expand-wildcards (concat (substring command idx) "*")))
          (prev (substring command 0 idx)))
     (mapcar (function (lambda (a) (concat prev a))) matches)))
+
+(defun ahg-string-match-p (&rest args)
+  (if (fboundp 'string-match-p)
+      (apply 'string-match-p args)
+    (save-match-data
+      (apply 'string-match args))))
 
 ;;-----------------------------------------------------------------------------
 ;; log-edit related functions
