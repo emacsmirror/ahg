@@ -1911,17 +1911,19 @@ selected files will be incorporated into the patch."
               (ahg-y-or-n-p "Import outstanding changes into patch? "))
          current-prefix-arg))
   (let ((files (when (eq major-mode 'ahg-status-mode)
-                 (mapcar 'cddr (ahg-status-get-marked nil)))))
+                 (mapcar 'cddr (ahg-status-get-marked nil))))
+        (qnew-args (append (when ahg-diff-use-git-format (list "--git"))
+                           (when force (list "--force")))))
     (if edit-log-message
         (ahg-log-edit
-         (lexical-let ((force force))
+         (lexical-let ((qnew-args qnew-args))
            (lambda () (interactive)
-             (ahg-mq-log-callback "qnew" (when force (list "-f")))))
+             (ahg-mq-log-callback "qnew" qnew-args)))
          (lexical-let ((flist (cons patchname files))) (lambda () flist))
          (generate-new-buffer "*aHg-log*"))
       ;; else
       (ahg-generic-command
-       "qnew" (append (when force (list "-f")) (list patchname) files)
+       "qnew" (append qnew-args (list patchname) files)
        (lexical-let ((aroot (ahg-root)))
          (lambda (process status)
            (if (string= status "finished\n")
@@ -1960,11 +1962,12 @@ only the selected files will be refreshed."
                     (buffer-substring-no-properties
                      (point-min) (1- (point-max)))))))
           (ahg-log-edit
-           (lambda () (interactive) (ahg-mq-log-callback "qrefresh"))
+           (lexical-let ((args (when ahg-diff-use-git-format (list "--git"))))
+             (lambda () (interactive) (ahg-mq-log-callback "qrefresh" args)))
            (lexical-let ((flist files)) (lambda () flist))
            buf msg content))
       (ahg-generic-command
-       "qrefresh" files
+       "qrefresh" (append (when ahg-diff-use-git-format (list "--git")) files)
        (lexical-let ((aroot (ahg-root)))
          (lambda (process status)
            (if (string= status "finished\n")
@@ -2751,7 +2754,8 @@ patch editing functionalities provided by Emacs."
          (when (eq major-mode 'ahg-status-mode)
            (mapcar 'cddr (ahg-status-get-marked nil)))))
   (ahg-do-record selected-files 'ahg-record-mq-commit
-                 "qnew" (list "--force" patchname)))
+                 "qnew" (append (when ahg-diff-use-git-format (list "--git"))
+                                (list "--force" patchname))))
 
                                           
 ;;-----------------------------------------------------------------------------
