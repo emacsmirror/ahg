@@ -2163,6 +2163,15 @@ last refresh."
      buf)))
 
 
+(define-generic-mode ahg-mq-series-mode
+  '("#") ;; comments
+  '() ;; keywords
+  '() ;; extra font locks
+  '() ;; auto mode list
+  '() ;; functions for setup
+  "Major mode for editing MQ patch series files.")
+
+
 (defun ahg-mq-edit-series ()
   (interactive)
   ;; first, check whether there is any patch applied. If so, ask the user
@@ -2177,7 +2186,8 @@ last refresh."
          (edit-series (lambda (root)
                         (find-file-other-window
                          (concat (file-name-as-directory root)
-                                 ".hg/patches/series")))))
+                                 ".hg/patches/series"))
+                        (ahg-mq-series-mode))))
       (if pop
           (ahg-generic-command
            "qpop" (list "--all")
