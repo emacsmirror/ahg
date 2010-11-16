@@ -1972,7 +1972,8 @@ only the selected files will be refreshed."
            (lexical-let ((flist files)) (lambda () flist))
            buf msg content))
       (ahg-generic-command
-       "qrefresh" (append (when ahg-qrefresh-use-short-flag (list "--short"))
+       "qrefresh" (append (when (and files ahg-qrefresh-use-short-flag)
+                            (list "--short"))
                           (when ahg-diff-use-git-format (list "--git")) files)
        (lexical-let ((aroot (ahg-root)))
          (lambda (process status)
