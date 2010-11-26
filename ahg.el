@@ -57,7 +57,7 @@
                       ["Grep the Working Directory" ahg-manifest-grep t]
                       ["--" nil nil]
                       ("Mercurial Queues"
-                       ["New Patch" ahg-qnew t]
+                       ["New Patch..." ahg-qnew t]
                        ["View Qdiff" ahg-qdiff t]
                        ["Refresh Current Patch" ahg-qrefresh t]
                        ["Go to Patch..." ahg-qgoto t]
@@ -425,7 +425,7 @@ Commands:
      )
     ["--" nil nil]
     ("Mercurial Queues"
-     ["New Patch" ahg-qnew [:keys "Qn" :active t]]
+     ["New Patch..." ahg-qnew [:keys "Qn" :active t]]
      ["New Interactive Patch" ahg-record-qnew [:keys "iQn" :active t]]
      ["View Qdiff" ahg-qdiff [:keys "Q=" :active t]]
      ["Refresh Current Patch" ahg-qrefresh [:keys "Qr" :active t]]
@@ -1902,8 +1902,9 @@ hg qseries command."
         nil))))
 
 (defun ahg-qnew (patchname force edit-log-message)
-  "Create a new mq patch PATCHNAME. If FORCE is non-nil, use the -f switch.
-If EDIT-LOG-MESSAGE is non-nil, pop a buffer to enter a commit
+  "Create a new mq patch PATCHNAME. If FORCE is nil, abort if
+there are outstanding changes in the working directory. If
+EDIT-LOG-MESSAGE is non-nil, pop a buffer to enter a commit
 message to use instead of the default one. When called
 interactively, the name of the patch and the FORCE flag are read
 from the minibuffer, and EDIT-LOG-MESSAGE is non-nil only if
@@ -1915,30 +1916,32 @@ selected files will be incorporated into the patch."
          (and (ahg-uncommitted-changes-p)
               (ahg-y-or-n-p "Import outstanding changes into patch? "))
          current-prefix-arg))
-  (let ((files (when (eq major-mode 'ahg-status-mode)
-                 (mapcar 'cddr (ahg-status-get-marked nil))))
-        (qnew-args (append (when ahg-diff-use-git-format (list "--git"))
-                           (when force (list "--force")))))
-    (if edit-log-message
-        (ahg-log-edit
-         (lexical-let ((qnew-args qnew-args))
-           (lambda () (interactive)
-             (ahg-mq-log-callback "qnew" qnew-args)))
-         (lexical-let ((flist (cons patchname files))) (lambda () flist))
-         (generate-new-buffer "*aHg-log*"))
-      ;; else
-      (ahg-generic-command
-       "qnew" (append qnew-args (list patchname) files)
-       (lexical-let ((aroot (ahg-root)))
-         (lambda (process status)
-           (if (string= status "finished\n")
-               (progn
-                 (ahg-status-maybe-refresh aroot)
-                 (ahg-mq-patches-maybe-refresh aroot)
-                 (message "mq command qnew successful.")
-                 (kill-buffer (process-buffer process)))
-             (ahg-show-error process)))))
-       )))
+  (if (and (not force) (ahg-uncommitted-changes-p))
+      (message "mq command qnew aborted.")
+    (let ((files (when (eq major-mode 'ahg-status-mode)
+                   (mapcar 'cddr (ahg-status-get-marked nil))))
+          (qnew-args (append (when ahg-diff-use-git-format (list "--git"))
+                             (list "--force"))))
+      (if edit-log-message
+          (ahg-log-edit
+           (lexical-let ((qnew-args qnew-args))
+             (lambda () (interactive)
+               (ahg-mq-log-callback "qnew" qnew-args)))
+           (lexical-let ((flist (cons patchname files))) (lambda () flist))
+           (generate-new-buffer "*aHg-log*"))
+        ;; else
+        (ahg-generic-command
+         "qnew" (append qnew-args (list patchname) files)
+         (lexical-let ((aroot (ahg-root)))
+           (lambda (process status)
+             (if (string= status "finished\n")
+                 (progn
+                   (ahg-status-maybe-refresh aroot)
+                   (ahg-mq-patches-maybe-refresh aroot)
+                   (message "mq command qnew successful.")
+                   (kill-buffer (process-buffer process)))
+               (ahg-show-error process)))))
+        ))))
 
 (defun ahg-qrefresh (get-log-message)
   "Refreshes the current mq patch. If GET-LOG-MESSAGE is non-nil,
