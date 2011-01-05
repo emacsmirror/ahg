@@ -1308,9 +1308,11 @@ a prefix argument, prompts also for EXTRA-FLAGS."
   (let ((buffer (get-buffer-create
                  (concat "*hg log (details): " (ahg-root) "*")))
         (command-list (ahg-args-add-revs r1 r2))
-        (template "{rev}:{node|short}\\n{branches}\\n{tags}\\n{parents}\\n{author}\\n{date|date}\\n{files}\\n\\t{desc|tabindent}\\n"))  
+        ;;(template "{rev}:{node|short}\\n{branches}\\n{tags}\\n{parents}\\n{author}\\n{date|date}\\n{files}\\n\\t{desc|tabindent}\\n"))
+        (ahglogpath (concat (file-name-directory (symbol-file 'ahg-log 'defun))
+                            "ahglog.py")))
     (setq command-list (append command-list
-                               (list "-v" "--template" template)
+                               (list "--style" "ahg")
                                (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
@@ -1334,7 +1336,56 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                   (propertize dn 'face ahg-header-line-root-face)
                   "\n\n")))
            (ahg-show-error process))))
-     buffer)))
+     buffer
+     nil ;; use-shell
+     nil ;; no-show-message
+     nil ;; report-untrusted
+     nil ;; filterfunc
+     nil ;; is-interactive
+     (list "--config" (format "extensions.ahglog=%s" ahglogpath)) ;; global-opts
+     )))
+
+(defvar ahg-log-file-line-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mouse-2]
+      (lambda (e)
+        (interactive "e")
+        (find-file-other-window
+         (ahg-log-filename-at-point (posn-point (event-start e))))))
+    (define-key map [mouse-1]
+      (lambda (e)
+        (interactive "e")
+        (let ((pt (posn-point (event-start e))))
+          (goto-char pt)
+          (let* ((r1 (ahg-log-revision-at-point t))
+                 (r2 (ahg-first-parent-of-rev r1)))
+            (ahg-diff
+             r1 r2
+             (list (ahg-log-filename-at-point pt)))))))
+    (define-key map "f"
+      (lambda ()
+        (interactive)
+        (find-file (ahg-log-filename-at-point (point)))))
+    (define-key map "o"
+      (lambda ()
+        (interactive)
+        (find-file-other-window (ahg-log-filename-at-point (point)))))
+    (define-key map "="
+      (lambda ()
+        (interactive)
+          (let* ((r1 (ahg-log-revision-at-point t))
+                 (r2 (ahg-first-parent-of-rev r1)))
+            (ahg-diff r1 r2 (list (ahg-log-filename-at-point (point)))))))
+    map))
+
+(defun ahg-log-filename-at-point (point)
+  (interactive "d")
+  (save-excursion
+    (goto-char point)
+    (buffer-substring-no-properties
+     (+ 13 ;; (length "             ")
+        (point-at-bol))
+     (point-at-eol))))
 
 (defun ahg-format-log-buffer ()
   (goto-char (point-min))
@@ -1372,9 +1423,19 @@ a prefix argument, prompts also for EXTRA-FLAGS."
         ;; sixth line, date
         (insert "date:        ")
         (next)
-        ;; seventh line, files
+        ;; seventh line, files, until an empty line is found
+        (set-text-properties (point-at-bol) (point-at-eol)
+                             (list 'mouse-face 'highlight
+                                   'keymap ahg-log-file-line-map))
         (insert "files:       ")
         (next)
+        (while (not (looking-at "^$"))
+          (set-text-properties (point-at-bol) (point-at-eol)
+                               (list 'mouse-face 'highlight
+                                     'keymap ahg-log-file-line-map))
+          (insert "             ")
+          (next))
+        (delete-char 1) ;; remove the empty line at the end of the list of files
         ;; rest is the description
         (insert "description:\n")
         ;; each line in the description starts with a '\t'
@@ -2803,7 +2864,8 @@ patch editing functionalities provided by Emacs."
                                               no-show-message
                                               report-untrusted
                                               filterfunc
-                                              is-interactive)
+                                              is-interactive
+                                              global-opts)
   "Executes then given hg command, with the given
 arguments. SENTINEL is a sentinel function. BUFFER is the
 destination buffer. If nil, a new buffer will be used."
@@ -2823,6 +2885,7 @@ destination buffer. If nil, a new buffer will be used."
                      (list "--config" "ui.report_untrusted=0"))
                    (when is-interactive
                      (list "--config" "ui.interactive=1"))
+                   global-opts
                    (list command) args))))
       (when ahg-subprocess-coding-system
         (set-process-coding-system process ahg-subprocess-coding-system))
