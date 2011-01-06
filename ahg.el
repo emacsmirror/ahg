@@ -1348,14 +1348,18 @@ a prefix argument, prompts also for EXTRA-FLAGS."
 (defvar ahg-log-file-line-map
   (let ((map (make-sparse-keymap)))
     (define-key map [mouse-2]
-      (lambda (e)
+      (lambda (event)
         (interactive "e")
-        (find-file-other-window
-         (ahg-log-filename-at-point (posn-point (event-start e))))))
-    (define-key map [mouse-1]
-      (lambda (e)
+        (select-window (posn-window (event-end event)) t)
+        (goto-char (posn-point (event-end event)))
+        (let ((fn (ahg-log-filename-at-point (point))))
+          (when (file-exists-p fn)
+            (find-file-other-window fn)))))
+    (define-key map [S-mouse-2]
+      (lambda (event)
         (interactive "e")
-        (let ((pt (posn-point (event-start e))))
+        (select-window (posn-window (event-end event)) t)
+        (let ((pt (posn-point (event-end event))))
           (goto-char pt)
           (let* ((r1 (ahg-log-revision-at-point t))
                  (r2 (ahg-first-parent-of-rev r1)))
@@ -1365,11 +1369,15 @@ a prefix argument, prompts also for EXTRA-FLAGS."
     (define-key map "f"
       (lambda ()
         (interactive)
-        (find-file (ahg-log-filename-at-point (point)))))
+        (let ((fn (ahg-log-filename-at-point (point))))
+          (when (file-exists-p fn)
+            (find-file fn)))))
     (define-key map "o"
       (lambda ()
         (interactive)
-        (find-file-other-window (ahg-log-filename-at-point (point)))))
+        (let ((fn (ahg-log-filename-at-point (point))))
+          (when (file-exists-p fn)
+            (find-file-other-window fn)))))
     (define-key map "="
       (lambda ()
         (interactive)
