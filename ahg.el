@@ -1364,7 +1364,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
           (let* ((r1 (ahg-log-revision-at-point t))
                  (r2 (ahg-first-parent-of-rev r1)))
             (ahg-diff
-             r1 r2
+             r2 r1
              (list (ahg-log-filename-at-point pt)))))))
     (define-key map "f"
       (lambda ()
@@ -1383,7 +1383,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
         (interactive)
           (let* ((r1 (ahg-log-revision-at-point t))
                  (r2 (ahg-first-parent-of-rev r1)))
-            (ahg-diff r1 r2 (list (ahg-log-filename-at-point (point)))))))
+            (ahg-diff r2 r1 (list (ahg-log-filename-at-point (point)))))))
     map))
 
 (defun ahg-log-filename-at-point (point)
