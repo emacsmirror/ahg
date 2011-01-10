@@ -1309,10 +1309,10 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                  (concat "*hg log (details): " (ahg-root) "*")))
         (command-list (ahg-args-add-revs r1 r2))
         ;;(template "{rev}:{node|short}\\n{branches}\\n{tags}\\n{parents}\\n{author}\\n{date|date}\\n{files}\\n\\t{desc|tabindent}\\n"))
-        (ahglogpath (concat (file-name-directory (symbol-file 'ahg-log 'defun))
-                            "ahglog.py")))
+        (ahgstyle (concat (file-name-directory (symbol-file 'ahg-log 'defun))
+                          "map-cmdline.ahg")))
     (setq command-list (append command-list
-                               (list "--style" "ahg")
+                               (list "--style" ahgstyle) ;"ahg")
                                (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
@@ -1337,12 +1337,6 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                   "\n\n")))
            (ahg-show-error process))))
      buffer
-     nil ;; use-shell
-     nil ;; no-show-message
-     nil ;; report-untrusted
-     nil ;; filterfunc
-     nil ;; is-interactive
-     (list "--config" (format "extensions.ahglog=%s" ahglogpath)) ;; global-opts
      )))
 
 (defvar ahg-log-file-line-map
