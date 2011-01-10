@@ -1426,11 +1426,12 @@ a prefix argument, prompts also for EXTRA-FLAGS."
         (insert "date:        ")
         (next)
         ;; seventh line, files, until an empty line is found
-        (set-text-properties (point-at-bol) (point-at-eol)
-                             (list 'mouse-face 'highlight
-                                   'keymap ahg-log-file-line-map))
-        (insert "files:       ")
-        (next)
+        (unless (looking-at "^$")
+          (set-text-properties (point-at-bol) (point-at-eol)
+                               (list 'mouse-face 'highlight
+                                     'keymap ahg-log-file-line-map))
+          (insert "files:       ")
+          (next))
         (while (not (looking-at "^$"))
           (set-text-properties (point-at-bol) (point-at-eol)
                                (list 'mouse-face 'highlight
