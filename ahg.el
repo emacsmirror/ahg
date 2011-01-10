@@ -1921,7 +1921,7 @@ the files under version control."
                                (query-replace-descr default))
                      "Search for pattern: "))))
       (if (and input (> (length input) 0)) input default))))
-  (grep (format "cd %s && %s manifest | xargs grep -nH -E '%s'"
+  (grep (format "cd %s && %s manifest | xargs grep -nHE -e %s"
                 (ahg-root) ahg-hg-command
                 (shell-quote-argument pattern))))
 
