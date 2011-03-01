@@ -569,7 +569,7 @@ the singleton list with the node at point."
   (let ((files (ahg-status-get-marked
                  'all (lambda (data)
                         (let ((f (cadr data)))
-                          (or (string= f "A") (string= f "C")))))))
+                          (or (string= f "!") (string= f "C")))))))
     (if (ahg-y-or-n-p (format "Remove %d files from hg? " (length files)))
         (ahg-generic-command
          "remove" (mapcar 'cddr files)
