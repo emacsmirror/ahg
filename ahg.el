@@ -169,6 +169,11 @@ when calling hg. This might not always work."
 `ahg-short-log' and `ahg-glog'."
   :group 'ahg :type 'integer)
 
+(defcustom ahg-map-cmdline-file nil
+  "Path to the file for mapping the command line.
+For `nil' the default file is used."
+  :group 'ahg :type 'string)
+
 (defface ahg-status-marked-face
   '((default (:inherit font-lock-preprocessor-face)))
   "Face for marked files in aHg status buffers." :group 'ahg)
@@ -1309,8 +1314,11 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                  (concat "*hg log (details): " (ahg-root) "*")))
         (command-list (ahg-args-add-revs r1 r2))
         ;;(template "{rev}:{node|short}\\n{branches}\\n{tags}\\n{parents}\\n{author}\\n{date|date}\\n{files}\\n\\t{desc|tabindent}\\n"))
-        (ahgstyle (concat (file-name-directory (symbol-file 'ahg-log 'defun))
-                          "map-cmdline.ahg")))
+        (ahgstyle (if ahg-map-cmdline-file
+                      ahg-map-cmdline-file
+                    (concat (file-name-directory
+                             (symbol-file 'ahg-log 'defun))
+                            "map-cmdline.ahg"))))
     (setq command-list (append command-list
                                (list "--style" ahgstyle) ;"ahg")
                                (when extra-flags (split-string extra-flags))))
