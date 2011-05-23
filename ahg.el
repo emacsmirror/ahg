@@ -29,6 +29,7 @@
 (require 'ewoc)
 (require 'cl)
 (require 'grep)
+(require 'dired)
 
 ;;-----------------------------------------------------------------------------
 ;; ahg-version
