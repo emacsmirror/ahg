@@ -2936,6 +2936,23 @@ destination buffer. If nil, a new buffer will be used."
   (let ((inhibit-read-only t))
     (insert msg "\n")))
 
+
+(defun ahg-command-prompt ()
+  "Prompts for data from the minibuffer and sends it to the
+current hg command."
+  (interactive)
+  (goto-char (point-max))
+  (let ((process (get-buffer-process (current-buffer)))
+        (msg (buffer-substring-no-properties
+              (point-at-bol) (point-at-eol)))
+        data)
+    (setq data (concat (read-string msg) "\n"))
+    (process-send-string process data)
+    (let ((inhibit-read-only t))
+      (insert data))
+    (set-marker (process-mark process) (point))
+    ))
+
 (define-derived-mode ahg-command-mode nil "aHg command"
   "Major mode for aHg commands.
 
@@ -2948,11 +2965,13 @@ Commands:
   (define-key ahg-command-mode-map "h" 'ahg-command-help)
   (define-key ahg-command-mode-map "q" 'ahg-buffer-quit)
   (define-key ahg-command-mode-map "!" 'ahg-do-command)
+  (define-key ahg-command-mode-map (kbd "C-i") 'ahg-command-prompt)
   (easy-menu-add ahg-command-mode-menu ahg-command-mode-map))
 
 (easy-menu-define ahg-command-mode-menu ahg-command-mode-map "aHg Command"
   '("aHg Command"
     ["Execute Hg Command" ahg-do-command [:keys "!" :active t]]
+    ["Get data from prompt" ahg-command-prompt [:keys (kbd "C-i") :active t]]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]))
 
