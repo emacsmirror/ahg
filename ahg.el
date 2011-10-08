@@ -3,6 +3,8 @@
 ;; Copyright (C) 2008 Alberto Griggio
 
 ;; Author: Alberto Griggio <agriggio@users.sourceforge.net>
+;; URL: https://bitbucket.org/agriggio/ahg
+;; Version: 0.99
 
 ;; This program is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -22,6 +24,8 @@
 ;;; Installation: put this file where Emacs can find it, and then add the line
 ;;; (require 'ahg)
 ;;; to your .emacs
+
+;;; Code goes here.
 
 (require 'diff-mode)
 (require 'easymenu)
@@ -3111,3 +3115,5 @@ starting with 'HG:'."
 
 
 (provide 'ahg)
+
+;;; ahg.el ends here
