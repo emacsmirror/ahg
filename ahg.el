@@ -39,7 +39,7 @@
 ;; ahg-version
 ;;-----------------------------------------------------------------------------
 
-(defvar ahg-version-string "0.99")
+(defvar ahg-version-string "1.0.0")
 
 (defun ahg-version ()
   "Shows aHg version number."
