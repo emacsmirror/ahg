@@ -368,6 +368,7 @@ Commands:
   (define-key ahg-status-mode-map "F" 'ahg-status-dired-find)
   (let ((showmap (make-sparse-keymap)))
     (define-key showmap "A" 'ahg-status-show-all)
+    (define-key showmap "t" 'ahg-status-show-tracked)
     (define-key showmap "m" 'ahg-status-show-modified)
     (define-key showmap "a" 'ahg-status-show-added)
     (define-key showmap "r" 'ahg-status-show-removed)
@@ -425,6 +426,7 @@ Commands:
     ["--" nil nil]
     ("Show"
      ["All" ahg-status-show-all [:keys "sA" :active t]]
+     ["Tracked" ahg-status-show-tracked [:keys "st" :active t]]
      ["Modified" ahg-status-show-modified [:keys "sm" :active t]]
      ["Added" ahg-status-show-added [:keys "sa" :active t]]
      ["Removed" ahg-status-show-removed [:keys "sr" :active t]]
@@ -524,6 +526,7 @@ to pass extra switches to hg status."
   (ewoc-map (lambda (d) (when (car d) (setcar d nil) t)) ewoc))
 
 (defun ahg-status-show-all () (interactive) (ahg-status "-A"))
+(defun ahg-status-show-tracked () (interactive) (ahg-status "-mardc"))
 (defun ahg-status-show-modified () (interactive) (ahg-status "-m"))
 (defun ahg-status-show-added () (interactive) (ahg-status "-a"))
 (defun ahg-status-show-removed () (interactive) (ahg-status "-r"))
@@ -531,6 +534,7 @@ to pass extra switches to hg status."
 (defun ahg-status-show-clean () (interactive) (ahg-status "-c"))
 (defun ahg-status-show-unknown () (interactive) (ahg-status "-u"))
 (defun ahg-status-show-ignored () (interactive) (ahg-status "-i"))
+
 
 (defun ahg-status-get-marked (action-if-empty &optional filter)
   "Returns the list of marked nodes. If such list is empty, behave according to
