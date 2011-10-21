@@ -457,18 +457,27 @@ Commands:
     ))
 
 
+(defvar ahg-status-consider-extra-switches nil)
+
 (defun ahg-status (&rest extra-switches)
   "Run hg status. When called non-interactively, it is possible
 to pass extra switches to hg status."
   (interactive)
   (let ((buf (get-buffer-create "*aHg-status*"))
         (curdir default-directory)
-        (show-message (interactive-p)))
+        (show-message (interactive-p))
+        (root (ahg-root)))
+    (when ahg-status-consider-extra-switches
+      (let ((sbuf (ahg-get-status-buffer root)))
+        (when sbuf
+          (with-current-buffer sbuf
+            (setq extra-switches ahg-status-extra-switches)))))    
     (with-current-buffer buf
       (let ((inhibit-read-only t))
         (erase-buffer))
       (setq default-directory (file-name-as-directory curdir))
-      (set (make-local-variable 'ahg-root) (ahg-root))
+      (set (make-local-variable 'ahg-root) root)
+      (set (make-local-variable 'ahg-status-extra-switches) extra-switches)
       (ahg-push-window-configuration))
     (ahg-generic-command
      "status" extra-switches
@@ -623,7 +632,8 @@ the singleton list with the node at point."
 
 (defun ahg-status-refresh ()
   (interactive)
-  (let ((ahg-status-point-pos (ahg-line-point-pos)))
+  (let ((ahg-status-point-pos (ahg-line-point-pos))
+        (ahg-status-consider-extra-switches t))
     (call-interactively 'ahg-status)))
 
 
@@ -633,7 +643,9 @@ the singleton list with the node at point."
       (when buf
         (let ((ahg-status-no-pop t)
               (ahg-status-point-pos
-               (with-current-buffer buf (ahg-line-point-pos))))
+               (with-current-buffer buf (ahg-line-point-pos)))
+              ;;(ahg-status-consider-extra-switches t) - not sure about this...
+              )
           (ahg-status))))))
 
 
@@ -729,7 +741,9 @@ ahg-status, and it has an ewoc associated with it."
                (root (with-current-buffer buf ahg-root))
                (ew (ahg-get-status-ewoc root))
                (outbuf (ewoc-buffer ew))
-               (cfg (with-current-buffer buf ahg-window-configuration)))
+               (cfg (with-current-buffer buf ahg-window-configuration))
+               (extra-switches
+                (with-current-buffer buf ahg-status-extra-switches)))
           (with-current-buffer buf
             (goto-char (point-min))
             (while (not (eobp))
@@ -748,7 +762,10 @@ ahg-status, and it has an ewoc associated with it."
             (when node (goto-char (ewoc-location node))))
           (when point-pos
             (with-current-buffer outbuf
-              (ahg-goto-line-point point-pos))))
+              (ahg-goto-line-point point-pos)))
+          (with-current-buffer outbuf
+            (set (make-local-variable 'ahg-status-extra-switches)
+                 extra-switches)))
       ;; error, we signal it and pop to the buffer
       (ahg-show-error process))))
 
