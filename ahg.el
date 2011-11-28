@@ -3062,7 +3062,7 @@ Commands:
 ;;-----------------------------------------------------------------------------
 
 (defun ahg-log-edit-hook (&optional extra-message content)
-  (goto-char (point-max))
+  (erase-buffer)
   (let ((user
          (with-temp-buffer
            (if (and
