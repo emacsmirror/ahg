@@ -2912,7 +2912,8 @@ destination buffer. If nil, a new buffer will be used."
           (list (concat ":" (propertize "%s" 'face '(:foreground "#DD0000"))))))
   (unless no-show-message (message "aHg: executing hg '%s' command..." command))
   (let ((lang (getenv "LANG")))
-    (unless ahg-i18n (setenv "LANG") (setenv "HGPLAIN" "1"))
+    (setenv "HGPLAIN" "1")
+    (unless ahg-i18n (setenv "LANG"))
     (let ((process
            (apply (if use-shell 'start-process-shell-command 'start-process)
                   (concat "*ahg-command-" command "*") buffer
