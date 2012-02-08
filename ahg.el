@@ -31,7 +31,8 @@
 (require 'easymenu)
 (require 'log-edit)
 (require 'ewoc)
-(require 'cl)
+(eval-when-compile
+  (require 'cl))
 (require 'grep)
 (require 'dired)
 
@@ -268,6 +269,15 @@ For `nil' the default file is used."
     (copy-face 'default 'ahg-invisible-face)
     (set-face-foreground 'ahg-invisible-face (face-background 'default))
     'ahg-invisible-face))
+
+
+;;-----------------------------------------------------------------------------
+;; some dynamically-generated variables, defined here to prevent compiler
+;;-----------------------------------------------------------------------------
+(defvar ahg-status-extra-switches)
+(defvar ahg-root)
+(defvar ewoc)
+(defvar ahg-window-configuration)
 
 
 ;;-----------------------------------------------------------------------------
@@ -1444,7 +1454,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                                      (point-at-bol) (point-at-eol))))
                 (kill-whole-line t))
             (kill-line)
-            (mapcar (lambda (tag) (insert "tag:         " tag "\n")) tags)))
+            (mapc (lambda (tag) (insert "tag:         " tag "\n")) tags)))
         ;; fourth line, parents
         (if (looking-at "^$")
             (delete-char 1) 
@@ -1452,7 +1462,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                                         (point-at-bol) (point-at-eol))))
                 (kill-whole-line t))
             (kill-line)
-            (mapcar (lambda (p) (insert "parent:      " p "\n")) parents)))
+            (mapc (lambda (p) (insert "parent:      " p "\n")) parents)))
         ;; fifth line, user
         (insert "user:        ")
         (next)
