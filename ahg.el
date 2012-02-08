@@ -377,6 +377,7 @@ Commands:
   (define-key ahg-status-mode-map "$" 'ahg-status-shell-command)
   (define-key ahg-status-mode-map "F" 'ahg-status-dired-find)
   (let ((showmap (make-sparse-keymap)))
+    (define-key showmap "s" 'ahg-status-show-default)
     (define-key showmap "A" 'ahg-status-show-all)
     (define-key showmap "t" 'ahg-status-show-tracked)
     (define-key showmap "m" 'ahg-status-show-modified)
@@ -435,6 +436,7 @@ Commands:
     ["Diff Marked" ahg-status-diff-all [:keys "D" :active t]]
     ["--" nil nil]
     ("Show"
+     ["Default" ahg-status-show-default [:keys "ss" :active t]]
      ["All" ahg-status-show-all [:keys "sA" :active t]]
      ["Tracked" ahg-status-show-tracked [:keys "st" :active t]]
      ["Modified" ahg-status-show-modified [:keys "sm" :active t]]
@@ -544,6 +546,7 @@ to pass extra switches to hg status."
   (interactive)
   (ewoc-map (lambda (d) (when (car d) (setcar d nil) t)) ewoc))
 
+(defun ahg-status-show-default () (interactive) (ahg-status ""))
 (defun ahg-status-show-all () (interactive) (ahg-status "-A"))
 (defun ahg-status-show-tracked () (interactive) (ahg-status "-mardc"))
 (defun ahg-status-show-modified () (interactive) (ahg-status "-m"))
