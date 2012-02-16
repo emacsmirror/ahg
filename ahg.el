@@ -1873,6 +1873,8 @@ that buffer is refreshed instead.)"
      t ;; report-untrusted
      (when is-interactive 'ahg-do-command-filter) ;; filterfunc
      is-interactive ;; is-interactive
+     nil ;; global-opts
+     (not is-interactive) ;; no-hgplain
      )))
 
 
@@ -2910,12 +2912,14 @@ patch editing functionalities provided by Emacs."
     (kill-buffer buf)))
 
 (defun ahg-generic-command (command args sentinel
-                                    &optional buffer use-shell
+                                    &optional buffer
+                                              use-shell
                                               no-show-message
                                               report-untrusted
                                               filterfunc
                                               is-interactive
-                                              global-opts)
+                                              global-opts
+                                              no-hgplain)
   "Executes then given hg command, with the given
 arguments. SENTINEL is a sentinel function. BUFFER is the
 destination buffer. If nil, a new buffer will be used."
@@ -2925,7 +2929,7 @@ destination buffer. If nil, a new buffer will be used."
           (list (concat ":" (propertize "%s" 'face '(:foreground "#DD0000"))))))
   (unless no-show-message (message "aHg: executing hg '%s' command..." command))
   (let ((lang (getenv "LANG")))
-    (setenv "HGPLAIN" "1")
+    (unless no-hgplain (setenv "HGPLAIN" "1"))
     (unless ahg-i18n (setenv "LANG"))
     (let ((process
            (apply (if use-shell 'start-process-shell-command 'start-process)
