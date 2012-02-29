@@ -1136,25 +1136,33 @@ do nothing."
     command-list))
 
 
+(defun ahg-maybe-revset (rev)
+  (not (null (string-match "[()]" rev))))
+
+
 ;; helper function used by ahg-short-log, ahg-log and ahg-log-cur-file to
 ;; get arguments from the user
 (defvar ahg-log-default-revisions '("tip" . "0"))
 (defun ahg-log-read-args (is-on-selected-files read-extra-flags)
-  (let ((retval
-         (append
-          (list (read-string
-                 (concat "hg log"
-                         (if is-on-selected-files " (on selected files)" "")
-                         ", R1: ") (car ahg-log-default-revisions))
-                (read-string
-                 (concat "hg log"
-                         (if is-on-selected-files " (on selected files)" "")
-                         ", R2: ") (ahg-log-revrange-end)))
-          (when read-extra-flags
-            (list (read-string
-                   (concat "hg log"
-                           (if is-on-selected-files " (on selected files)" "")
-                           ", extra switches: ") ""))))))
+  (let* ((firstrev
+          (read-string
+           (concat "hg log"
+                   (if is-on-selected-files " (on selected files)" "")
+                   ", R1: ") (car ahg-log-default-revisions)))
+         (retval
+          (append
+           (list
+            firstrev
+            (when (not (ahg-maybe-revset firstrev))
+              (read-string
+               (concat "hg log"
+                       (if is-on-selected-files " (on selected files)" "")
+                       ", R2: ") (ahg-log-revrange-end))))
+           (when read-extra-flags
+             (list (read-string
+                    (concat "hg log"
+                            (if is-on-selected-files " (on selected files)" "")
+                            ", extra switches: ") ""))))))
     ;; remember the values entered for the next call
     (setq ahg-log-default-revisions (cons (car retval) (cadr retval)))
     retval))
