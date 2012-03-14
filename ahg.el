@@ -1349,6 +1349,18 @@ buffer, do nothing."
       (goto-char rev-pos))))
 
 (defvar ahg-dir-name-for-log-command nil)
+
+(defconst ahg-log-style-map
+  "changeset = \"{rev}:{node|short}\\n{branches}\\n{tags}\\n{parents}\\n{author}\\n{date|date}\\n{files}\\n\\t{desc|tabindent}\\n\"
+file = \"{file}\\n\"
+")
+
+(defun ahg-log-prepare-style-map ()
+  (unless (file-exists-p "/dev/stdin")
+    (let ((f (make-temp-file "ahg")))
+      (with-temp-file f
+        (insert ahg-log-style-map))
+      f)))
   
 (defun ahg-log (r1 r2 &optional extra-flags)
   "Run hg log. R1 and R2 specify the range of revisions to
@@ -1360,14 +1372,10 @@ a prefix argument, prompts also for EXTRA-FLAGS."
   (let ((buffer (get-buffer-create
                  (concat "*hg log (details): " (ahg-root) "*")))
         (command-list (ahg-args-add-revs r1 r2))
-        ;;(template "{rev}:{node|short}\\n{branches}\\n{tags}\\n{parents}\\n{author}\\n{date|date}\\n{files}\\n\\t{desc|tabindent}\\n"))
-        (ahgstyle (if ahg-map-cmdline-file
-                      ahg-map-cmdline-file
-                    (concat (file-name-directory
-                             (symbol-file 'ahg-log 'defun))
-                            "map-cmdline.ahg"))))
+        (ahgstyle (ahg-log-prepare-style-map)))
     (setq command-list (append command-list
-                               (list "--style" ahgstyle) ;"ahg")
+                               (list "--style" (if ahgstyle ahgstyle
+                                                 "/dev/stdin"))
                                (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
@@ -1375,24 +1383,34 @@ a prefix argument, prompts also for EXTRA-FLAGS."
       (let ((inhibit-read-only t))
         (erase-buffer)
         (ahg-push-window-configuration)))
-    (ahg-generic-command
-     "log" command-list
-     (lexical-let ((dn (or ahg-dir-name-for-log-command default-directory)))
-       (lambda (process status)
-         (if (string= status "finished\n")
-             (progn
-               (pop-to-buffer (process-buffer process))
-               (ahg-format-log-buffer)
-               (ahg-log-mode)
-               (goto-char (point-min))
-               (let ((inhibit-read-only t))
-                 (insert
-                  (propertize "hg log for " 'face ahg-header-line-face)
-                  (propertize dn 'face ahg-header-line-root-face)
-                  "\n\n")))
-           (ahg-show-error process))))
-     buffer
-     )))
+    (let ((proc
+           (ahg-generic-command
+            "log" command-list
+            (lexical-let ((dn (or ahg-dir-name-for-log-command
+                                  default-directory))
+                          (ahgstyle ahgstyle))
+              (lambda (process status)
+                (if (string= status "finished\n")
+                    (progn
+                      (pop-to-buffer (process-buffer process))
+                      (ahg-format-log-buffer)
+                      (ahg-log-mode)
+                      (goto-char (point-min))
+                      (let ((inhibit-read-only t))
+                        (insert
+                         (propertize "hg log for " 'face ahg-header-line-face)
+                         (propertize dn 'face ahg-header-line-root-face)
+                         "\n\n"))
+                      (when ahgstyle
+                        (delete-file ahgstyle)))
+                  (ahg-show-error process))))
+            buffer
+            )))
+      (unless ahgstyle
+        (process-send-string proc ahg-log-style-map)
+        (process-send-eof proc)
+        ))))
+      
 
 (defvar ahg-log-file-line-map
   (let ((map (make-sparse-keymap)))
@@ -2936,7 +2954,8 @@ destination buffer. If nil, a new buffer will be used."
     (setq mode-line-process
           (list (concat ":" (propertize "%s" 'face '(:foreground "#DD0000"))))))
   (unless no-show-message (message "aHg: executing hg '%s' command..." command))
-  (let ((lang (getenv "LANG")))
+  (let ((lang (getenv "LANG"))
+        retprocess)
     (unless no-hgplain (setenv "HGPLAIN" "1"))
     (unless ahg-i18n (setenv "LANG"))
     (let ((process
@@ -2964,10 +2983,13 @@ destination buffer. If nil, a new buffer will be used."
            (setq mode-line-process nil)
            (funcall sf p s))))
       (set-process-filter process filterfunc)
+      (setq retprocess process)
       )
     (setenv "HGPLAIN")
     (setenv "LANG" lang)
-    ))
+    retprocess
+    )
+  )
 
 (defun ahg-show-error (process)
   "Displays an error message for the given process."
