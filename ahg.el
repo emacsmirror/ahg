@@ -364,6 +364,7 @@ Commands:
   (define-key ahg-status-mode-map "D" 'ahg-status-diff-all)
   (define-key ahg-status-mode-map "r" 'ahg-status-remove)
   (define-key ahg-status-mode-map "g" 'ahg-status-refresh)
+  (define-key ahg-status-mode-map "I" 'ahg-status-add-to-hgignore)
   (define-key ahg-status-mode-map "q" 'ahg-buffer-quit)
   (define-key ahg-status-mode-map "U" 'ahg-status-undo)
   (define-key ahg-status-mode-map "!" 'ahg-status-do-command)
@@ -419,6 +420,7 @@ Commands:
     ["Add" ahg-status-add [:keys "a" :active t]]
     ["Remove" ahg-status-remove [:keys "r" :active t]]
     ["Add/Remove" ahg-status-addremove [:keys "A" :active t]]
+    ["Add to .hgignore" ahg-status-add-to-hgignore [:keys "I" :active t]]
     ["Undo" ahg-status-undo [:keys "U" :active t]]
     ["Hg Command" ahg-status-do-command [:keys "!" :active t]]
     ["Shell Command" ahg-status-shell-command [:keys "$" :active t]]
@@ -866,6 +868,20 @@ Uses find-dired to get them into nicely."
        (concat "-path \"*/" (cddr f) "\" -or"))
      files " ")
     " -false")))
+
+
+(defun ahg-status-add-to-hgignore (files)
+  "Adds the selected files to .hgignore for the current repository."
+  (interactive (list (ahg-status-get-marked 'cur)))
+  (let* ((aroot (ahg-root))
+         (hgignore (concat (file-name-as-directory aroot) ".hgignore"))
+         (buf (find-file-noselect hgignore)))
+    (with-current-buffer buf
+      (goto-char (point-max))
+      (insert "\n# added by aHg on " (current-time-string) "\nsyntax: glob\n")
+      (mapc (lambda (f) (insert (cddr f) "\n")) files)
+      (save-buffer))
+    (ahg-status-maybe-refresh aroot)))
 
 ;;-----------------------------------------------------------------------------
 ;; hg commit
