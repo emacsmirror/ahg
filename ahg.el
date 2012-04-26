@@ -870,18 +870,22 @@ Uses find-dired to get them into nicely."
     " -false")))
 
 
-(defun ahg-status-add-to-hgignore (files)
+(defun ahg-status-add-to-hgignore ()
   "Adds the selected files to .hgignore for the current repository."
-  (interactive (list (ahg-status-get-marked 'cur)))
-  (let* ((aroot (ahg-root))
-         (hgignore (concat (file-name-as-directory aroot) ".hgignore"))
-         (buf (find-file-noselect hgignore)))
-    (with-current-buffer buf
-      (goto-char (point-max))
-      (insert "\n# added by aHg on " (current-time-string) "\nsyntax: glob\n")
-      (mapc (lambda (f) (insert (cddr f) "\n")) files)
-      (save-buffer))
-    (ahg-status-maybe-refresh aroot)))
+  (interactive)
+  (let ((files (ahg-status-get-marked 'cur)))
+    (when (ahg-y-or-n-p (format "Add %d files to .hgignore? " (length files)))
+      (let* ((aroot (ahg-root))
+             (hgignore (concat (file-name-as-directory aroot) ".hgignore")))
+        (with-temp-buffer
+          (insert-file-contents hgignore)
+          (goto-char (point-max))
+          (insert "\n# added by aHg on " (current-time-string)
+                  "\nsyntax: glob\n")
+          (mapc (lambda (f) (insert (cddr f) "\n")) files)
+          (write-file hgignore)
+          (kill-buffer))
+        (ahg-status-maybe-refresh aroot)))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg commit
