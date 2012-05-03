@@ -407,6 +407,9 @@ Commands:
       (define-key iqmap "n" 'ahg-record-qnew)
       (define-key imap "Q" iqmap))
     (define-key ahg-status-mode-map "i" imap))
+  (let ((amap (make-sparse-keymap)))
+    (define-key amap "a" 'ahg-status-commit-amend)
+    (define-key ahg-status-mode-map "C" amap))
   (easy-menu-add ahg-status-mode-menu ahg-status-mode-map))
 
 (easy-menu-define ahg-status-mode-menu ahg-status-mode-map "aHg Status"
@@ -417,6 +420,7 @@ Commands:
     ["--" nil nil]
     ["Commit" ahg-status-commit [:keys "c" :active t]]
     ["Interactive Commit (Record)" ahg-record [:keys "ic" :active t]]
+    ["Amend" ahg-status-commit-amend [:keys "Ca" :active t]]
     ["Add" ahg-status-add [:keys "a" :active t]]
     ["Remove" ahg-status-remove [:keys "r" :active t]]
     ["Add/Remove" ahg-status-addremove [:keys "A" :active t]]
@@ -582,6 +586,13 @@ the singleton list with the node at point."
   (interactive)
   (let ((files (ahg-status-get-marked nil)))
     (ahg-commit (mapcar 'cddr files))))
+
+(defun ahg-status-commit-amend ()
+  (interactive)
+  (let ((files (ahg-status-get-marked nil)))
+    (when (ahg-y-or-n-p (format "Amend the parent changeset and commit %s? "
+                                (if files "the selected files" "all changes")))
+      (ahg-commit (append (list "--amend") (mapcar 'cddr files))))))
 
 (defun ahg-status-add ()
   (interactive)
