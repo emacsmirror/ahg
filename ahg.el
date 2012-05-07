@@ -589,10 +589,22 @@ the singleton list with the node at point."
 
 (defun ahg-status-commit-amend ()
   (interactive)
-  (let ((files (ahg-status-get-marked nil)))
-    (when (ahg-y-or-n-p (format "Amend the parent changeset and commit %s? "
-                                (if files "the selected files" "all changes")))
-      (ahg-commit (append (list "--amend") (mapcar 'cddr files))))))
+  (let ((files (ahg-status-get-marked nil))
+        msg
+        logmsg)
+    (with-temp-buffer
+      (when (= (ahg-call-process "log"
+                                 (list "-r" "." "--template"
+                                       "{node|short}\\n{desc}")) 0)
+        (goto-char (point-min))
+        (setq msg (format "amending changeset %s"
+                          (buffer-substring-no-properties (point-min)
+                                                          (point-at-eol))))
+        (forward-line 1)
+        (setq logmsg (buffer-substring-no-properties
+                      (point-at-bol) (point-max)))))
+    (ahg-commit (append (list "--amend") (mapcar 'cddr files))
+                msg logmsg)))
 
 (defun ahg-status-add ()
   (interactive)
@@ -923,13 +935,15 @@ Uses find-dired to get them into nicely."
              (ahg-show-error process)))))))
   (kill-buffer (current-buffer)))
 
-(defun ahg-commit (files)
+(defun ahg-commit (files &optional msg logmsg)
   "Run hg commit. Pops up a buffer for editing the log file."
   (let ((buf (generate-new-buffer "*aHg-log*")))
     (ahg-log-edit
      'ahg-commit-callback
      (lexical-let ((flist files)) (lambda () flist))
-     buf)))
+     buf
+     msg
+     logmsg)))
 
 (defun ahg-commit-cur-file ()
   "Run hg commit on the current file only."
