@@ -901,7 +901,8 @@ Uses find-dired to get them into nicely."
       (let* ((aroot (ahg-root))
              (hgignore (concat (file-name-as-directory aroot) ".hgignore")))
         (with-temp-buffer
-          (insert-file-contents hgignore)
+          (when (file-exists-p hgignore)
+            (insert-file-contents hgignore))
           (goto-char (point-max))
           (insert "\n# added by aHg on " (current-time-string)
                   "\nsyntax: glob\n")
