@@ -67,6 +67,8 @@
                        ["View Qdiff" ahg-qdiff t]
                        ["Refresh Current Patch" ahg-qrefresh t]
                        ["Go to Patch..." ahg-qgoto t]
+                       ["Move to Patch..." ahg-qmove t]
+                       ["Switch to Patch..." ahg-qswitch t]
                        ["Pop All Patches" ahg-qpop-all t]
                        ["Show Name of Current Patch" ahg-qtop t]
                        ["List All Patches" ahg-mq-list-patches t]
@@ -98,6 +100,8 @@
         (define-key qmap "=" 'ahg-qdiff)
         (define-key qmap "r" 'ahg-qrefresh)
         (define-key qmap "g" 'ahg-qgoto)
+        (define-key qmap "m" 'ahg-qmove)
+        (define-key qmap "s" 'ahg-qswitch)
         (define-key qmap "p" 'ahg-qpop-all)
         (define-key qmap "t" 'ahg-qtop)
         (define-key qmap "d" 'ahg-qdelete)
@@ -394,6 +398,8 @@ Commands:
     (define-key qmap "=" 'ahg-qdiff)
     (define-key qmap "r" 'ahg-qrefresh)
     (define-key qmap "g" 'ahg-qgoto)
+    (define-key qmap "m" 'ahg-qmove)
+    (define-key qmap "s" 'ahg-qswitch)
     (define-key qmap "p" 'ahg-qpop-all)
     (define-key qmap "t" 'ahg-qtop)
     (define-key qmap "d" 'ahg-qdelete)
@@ -460,6 +466,8 @@ Commands:
      ["View Qdiff" ahg-qdiff [:keys "Q=" :active t]]
      ["Refresh Current Patch" ahg-qrefresh [:keys "Qr" :active t]]
      ["Go to Patch..." ahg-qgoto [:keys "Qg" :active t]]
+     ["Move to Patch..." ahg-qmove [:keys "Qm" :active t]]
+     ["Switch to Patch..." ahg-qswitch [:keys "Qs" :active t]]
      ["Pop All Patches" ahg-qpop-all [:keys "Qp" :active t]]
      ["Show Name of Current Patch" ahg-qtop [:keys "Qt" :active t]]
      ["List All Patches" ahg-mq-list-patches [:keys "Ql" :active t]]
@@ -2207,6 +2215,81 @@ called interactively, PATCHNAME and FORCE are read from the minibuffer.
                    (kill-buffer (process-buffer process)))))
            (ahg-show-error process)))))))
 
+
+(defun ahg-qmove (patchname force)
+  "Like `ahg-qgoto', but reorder patch series and apply only the given patch."
+  (interactive
+   (list (completing-read
+          "Move to patch: "
+          (ahg-dynamic-completion-table ahg-complete-mq-patch-name))
+         (and (ahg-uncommitted-changes-p)
+              (ahg-y-or-n-p "Overwrite local changes? "))))
+  (let ((args (append (list "--move")
+                      (if force (list "-f" patchname) (list patchname))))
+        (finishfunc
+         (lexical-let ((aroot (ahg-root)))
+           (lambda (process status)
+             (if (string= status "finished\n")
+                 (progn
+                   (ahg-status-maybe-refresh aroot)
+                   (ahg-mq-patches-maybe-refresh aroot)
+                   (let ((msg
+                          (with-current-buffer (process-buffer process)
+                            (goto-char (point-max))
+                            (forward-char -1)
+                            (beginning-of-line)
+                            (buffer-substring-no-properties
+                             (point-at-bol) (point-at-eol)))))
+                     (message msg)
+                     (if (ahg-string-match-p "^errors " msg)
+                         (ahg-show-error process)
+                       (kill-buffer (process-buffer process)))))
+               (ahg-show-error process))))))
+    (ahg-generic-command "qpush" args finishfunc)))
+
+
+(defun ahg-qswitch (patchname force)
+  "Like `ahg-qmove', but pop the currently applied patches before moving."
+  (interactive
+   (list (completing-read
+          "Move to patch: "
+          (ahg-dynamic-completion-table ahg-complete-mq-patch-name))
+         (and (ahg-uncommitted-changes-p)
+              (ahg-y-or-n-p "Overwrite local changes? "))))
+  (let ((args (append (list "--move")
+                      (if force (list "-f" patchname) (list patchname))))
+        (finishfunc
+         (lexical-let ((aroot (ahg-root)))
+           (lambda (process status)
+             (if (string= status "finished\n")
+                 (progn
+                   (ahg-status-maybe-refresh aroot)
+                   (ahg-mq-patches-maybe-refresh aroot)
+                   (let ((msg
+                          (with-current-buffer (process-buffer process)
+                            (goto-char (point-max))
+                            (forward-char -1)
+                            (beginning-of-line)
+                            (buffer-substring-no-properties
+                             (point-at-bol) (point-at-eol)))))
+                     (message msg)
+                     (if (ahg-string-match-p "^errors " msg)
+                         (ahg-show-error process)
+                       (kill-buffer (process-buffer process)))))
+               (ahg-show-error process))))))
+    (if (ahg-mq-applied-patches-p)
+        (ahg-generic-command
+         "qpop" (if force (list "-f" "-a") (list "-a"))
+         (lexical-let ((aroot (ahg-root))
+                       (finishfunc finishfunc)
+                       (args args))
+           (lambda (process status)
+             (if (string= status "finished\n")
+                 (ahg-generic-command "qpush" args finishfunc)
+               (ahg-show-error process)))))
+      (ahg-generic-command "qpush" args finishfunc))))
+
+
 (defun ahg-qpop-all (force)
   "Pops all patches off the mq stack. If FORCE is non-nil,
 discards any local changes. When called interactively, FORCE is
@@ -2403,6 +2486,8 @@ last refresh."
     (define-key map [?h] 'ahg-command-help)
     (define-key map [?=] 'ahg-mq-patches-view-patch)
     (define-key map [?\r] 'ahg-mq-patches-goto-patch)
+    (define-key map [?m] 'ahg-mq-patches-moveto-patch)
+    (define-key map [?s] 'ahg-mq-patches-switchto-patch)
     (define-key map [?p] 'ahg-qpop-all)
     (define-key map [?n] 'ahg-qnew)
     (define-key map [?e] 'ahg-mq-edit-series)
@@ -2422,6 +2507,8 @@ last refresh."
   '("aHg MQ Patches"
     ["View Patch" ahg-mq-patches-view-patch [:keys "=" :active t]]
     ["Go to Patch" ahg-mq-patches-goto-patch [:keys "\r" :active t]]
+    ["Move to Patch" ahg-mq-patches-moveto-patch [:keys "m" :active t]]
+    ["Switch to Patch" ahg-mq-patches-switchto-patch [:keys "s" :active t]]
     ["New Patch..." ahg-qnew [:keys "n" :active t]]
     ["Delete Patch" ahg-mq-patches-delete-patch [:keys "D" :active t]]
     ["Pop All Patches" ahg-qpop-all [:keys "p" :active t]]
@@ -2648,6 +2735,25 @@ stack of applied patches."
          (ok (and patch (ahg-y-or-n-p (format "Go to patch %s? " patch)))))
     (when ok
       (ahg-qgoto patch force))))
+
+
+(defun ahg-mq-patches-moveto-patch (force)
+  "Like `ahg-mq-patches-goto-patch', but reorder patch series and
+apply only the given patch."
+  (interactive "P")
+  (let* ((patch (ahg-mq-patches-patch-at-point))
+         (ok (and patch (ahg-y-or-n-p (format "Move to patch %s? " patch)))))
+    (when ok
+      (ahg-qmove patch force))))
+
+
+(defun ahg-mq-patches-switchto-patch (force)
+  "Pop all applied patches and move to the given patch."
+  (interactive "P")
+  (let* ((patch (ahg-mq-patches-patch-at-point))
+         (ok (and patch (ahg-y-or-n-p (format "Switch to patch %s? " patch)))))
+    (when ok
+      (ahg-qswitch patch force))))
 
 
 (defun ahg-mq-patches-view-patch-mouse (event)
@@ -3151,6 +3257,12 @@ Commands:
       (apply 'string-match-p args)
     (save-match-data
       (apply 'string-match args))))
+
+(defun ahg-mq-applied-patches-p (&optional root)
+  (with-temp-buffer
+    (let ((global-opts (when root (list "-R" root))))
+      (when (= (ahg-call-process "qapplied" nil global-opts) 0)
+        (> (buffer-size) 0)))))
 
 ;;-----------------------------------------------------------------------------
 ;; log-edit related functions
