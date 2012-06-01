@@ -671,7 +671,8 @@ the singleton list with the node at point."
 (defun ahg-status-refresh ()
   (interactive)
   (let ((ahg-status-point-pos (ahg-line-point-pos))
-        (ahg-status-consider-extra-switches t))
+        ;;(ahg-status-consider-extra-switches t)
+        )
     (call-interactively 'ahg-status)))
 
 
