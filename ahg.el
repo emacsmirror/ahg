@@ -2026,9 +2026,9 @@ that buffer is refreshed instead.)"
 ;;-----------------------------------------------------------------------------
 
 (defvar ahg-manifest-grep-pattern-history nil
-  "History for patterns of `ahg-manifest-grep-'.")
+  "History for patterns of `ahg-manifest-grep'.")
 
-(defun ahg-manifest-grep (pattern)
+(defun ahg-manifest-grep (pattern glob)
   "Search for grep-like pattern in the working directory, considering only
 the files under version control."
   (interactive
@@ -2045,9 +2045,11 @@ the files under version control."
                        (format "Search for pattern (default %s): "
                                (query-replace-descr default))
                      "Search for pattern: "))))
-      (if (and input (> (length input) 0)) input default))))
-  (grep (format "cd %s && %s manifest | xargs grep -nHE -e %s"
+      (if (and input (> (length input) 0)) input default))
+    (if current-prefix-arg (read-string "Files to search: ") "")))
+  (grep (format "cd %s && %s locate -0 %s | xargs -0 grep -nHE -e %s"
                 (ahg-root) ahg-hg-command
+                (shell-quote-argument glob)
                 (shell-quote-argument pattern))))
 
 ;;-----------------------------------------------------------------------------
