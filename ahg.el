@@ -1411,11 +1411,10 @@ file = \"{file}\\n\"
 ")
 
 (defun ahg-log-prepare-style-map ()
-  (unless (file-exists-p "/dev/stdin")
-    (let ((f (make-temp-file "ahg")))
-      (with-temp-file f
-        (insert ahg-log-style-map))
-      f)))
+  (let ((f (make-temp-file "ahg")))
+    (with-temp-file f
+      (insert ahg-log-style-map))
+    f))
   
 (defun ahg-log (r1 r2 &optional extra-flags)
   "Run hg log. R1 and R2 specify the range of revisions to
@@ -1429,8 +1428,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
         (command-list (ahg-args-add-revs r1 r2))
         (ahgstyle (ahg-log-prepare-style-map)))
     (setq command-list (append command-list
-                               (list "--style" (if ahgstyle ahgstyle
-                                                 "/dev/stdin"))
+                               (list "--style" ahgstyle)
                                (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
@@ -1456,15 +1454,11 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                          (propertize "hg log for " 'face ahg-header-line-face)
                          (propertize dn 'face ahg-header-line-root-face)
                          "\n\n"))
-                      (when ahgstyle
-                        (delete-file ahgstyle)))
+                      (delete-file ahgstyle))
                   (ahg-show-error process))))
             buffer
             )))
-      (unless ahgstyle
-        (process-send-string proc ahg-log-style-map)
-        (process-send-eof proc)
-        ))))
+      )))
       
 
 (defvar ahg-log-file-line-map
