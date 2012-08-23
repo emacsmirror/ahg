@@ -69,6 +69,7 @@
                        ["Go to Patch..." ahg-qgoto t]
                        ["Move to Patch..." ahg-qmove t]
                        ["Switch to Patch..." ahg-qswitch t]
+                       ["Apply Patch to the Working Copy..." ahg-qapply t]
                        ["Pop All Patches" ahg-qpop-all t]
                        ["Show Name of Current Patch" ahg-qtop t]
                        ["List All Patches" ahg-mq-list-patches t]
@@ -102,6 +103,7 @@
         (define-key qmap "g" 'ahg-qgoto)
         (define-key qmap "m" 'ahg-qmove)
         (define-key qmap "s" 'ahg-qswitch)
+        (define-key qmap "a" 'ahg-qapply)
         (define-key qmap "p" 'ahg-qpop-all)
         (define-key qmap "t" 'ahg-qtop)
         (define-key qmap "d" 'ahg-qdelete)
@@ -400,6 +402,7 @@ Commands:
     (define-key qmap "g" 'ahg-qgoto)
     (define-key qmap "m" 'ahg-qmove)
     (define-key qmap "s" 'ahg-qswitch)
+    (define-key qmap "a" 'ahg-qapply)
     (define-key qmap "p" 'ahg-qpop-all)
     (define-key qmap "t" 'ahg-qtop)
     (define-key qmap "d" 'ahg-qdelete)
@@ -468,6 +471,7 @@ Commands:
      ["Go to Patch..." ahg-qgoto [:keys "Qg" :active t]]
      ["Move to Patch..." ahg-qmove [:keys "Qm" :active t]]
      ["Switch to Patch..." ahg-qswitch [:keys "Qs" :active t]]
+     ["Apply Patch to the Working Copy..." ahg-qapply [:keys "Qa" :active t]]
      ["Pop All Patches" ahg-qpop-all [:keys "Qp" :active t]]
      ["Show Name of Current Patch" ahg-qtop [:keys "Qt" :active t]]
      ["List All Patches" ahg-mq-list-patches [:keys "Ql" :active t]]
@@ -2286,6 +2290,36 @@ called interactively, PATCHNAME and FORCE are read from the minibuffer.
       (ahg-generic-command "qpush" args finishfunc))))
 
 
+(defun ahg-qapply (patchname force)
+  "Apply the patch PATCHNAME to the working copy, without
+actually modifying the status of the repo and of the patch
+queue. If there are local changes, proceed only if FORCE is
+non-nil. When called interactively, FORCE is read from the
+minibuffer."
+  (interactive
+   (list (completing-read
+          "Apply patch (to the working copy): "
+          (ahg-dynamic-completion-table ahg-complete-mq-patch-name))
+         (and (ahg-uncommitted-changes-p)
+              (ahg-y-or-n-p
+               "Working copy contains local changes, proceed anyway? "))))
+  (let ((aroot (file-name-as-directory (ahg-root)))
+        (curwc (current-window-configuration))
+        (buffer (generate-new-buffer "*ahg-command*")))
+    (with-current-buffer buffer
+      (let ((default-directory aroot)
+            (patchfile (concat aroot ".hg/patches/" patchname)))
+        (if (= (ahg-call-process "patch"
+                                 (list "-p" "1" "--no-commit" patchfile)) 0)
+            (progn
+              (kill-buffer)
+              (set-window-configuration curwc)
+              (message "Applied patch %s to the working copy" patchname))
+          (pop-to-buffer buffer)
+          (message "Error applying patch %s to the working copy" patchname))))
+    (ahg-status-maybe-refresh aroot)))
+
+
 (defun ahg-qpop-all (force)
   "Pops all patches off the mq stack. If FORCE is non-nil,
 discards any local changes. When called interactively, FORCE is
@@ -2484,6 +2518,7 @@ last refresh."
     (define-key map [?\r] 'ahg-mq-patches-goto-patch)
     (define-key map [?m] 'ahg-mq-patches-moveto-patch)
     (define-key map [?s] 'ahg-mq-patches-switchto-patch)
+    (define-key map [?a] 'ahg-mq-patches-apply-patch)
     (define-key map [?p] 'ahg-qpop-all)
     (define-key map [?n] 'ahg-qnew)
     (define-key map [?e] 'ahg-mq-edit-series)
@@ -2505,6 +2540,8 @@ last refresh."
     ["Go to Patch" ahg-mq-patches-goto-patch [:keys "\r" :active t]]
     ["Move to Patch" ahg-mq-patches-moveto-patch [:keys "m" :active t]]
     ["Switch to Patch" ahg-mq-patches-switchto-patch [:keys "s" :active t]]
+    ["Apply Patch to the Working Copy" ahg-mq-patches-apply-patch
+     [:keys "a" :active t]]
     ["New Patch..." ahg-qnew [:keys "n" :active t]]
     ["Delete Patch" ahg-mq-patches-delete-patch [:keys "D" :active t]]
     ["Pop All Patches" ahg-qpop-all [:keys "p" :active t]]
@@ -2750,6 +2787,17 @@ apply only the given patch."
          (ok (and patch (ahg-y-or-n-p (format "Switch to patch %s? " patch)))))
     (when ok
       (ahg-qswitch patch force))))
+
+
+(defun ahg-mq-patches-apply-patch (force)
+  "Apply the given patch to the working copy, without modifying the repository."
+  (interactive "P")
+  (let* ((patch (ahg-mq-patches-patch-at-point))
+         (ok (and patch
+                  (ahg-y-or-n-p
+                   (format "Apply patch %s to the working copy? " patch)))))
+    (when ok
+      (ahg-qapply patch force))))
 
 
 (defun ahg-mq-patches-view-patch-mouse (event)
