@@ -2307,10 +2307,12 @@ minibuffer."
         (curwc (current-window-configuration))
         (buffer (generate-new-buffer "*ahg-command*")))
     (with-current-buffer buffer
-      (let ((default-directory aroot)
-            (patchfile (concat aroot ".hg/patches/" patchname)))
-        (if (= (ahg-call-process "patch"
-                                 (list "-p" "1" "--no-commit" patchfile)) 0)
+      (let* ((default-directory aroot)
+             (patchfile (concat aroot ".hg/patches/" patchname))
+             (args (list "-p" "1" "--no-commit" patchfile)))
+        (when force
+          (setq args (cons "--force" args)))
+        (if (= (ahg-call-process "patch" args) 0)
             (progn
               (kill-buffer)
               (set-window-configuration curwc)
