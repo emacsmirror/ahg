@@ -350,7 +350,7 @@ the current dir is not under hg."
   (gethash status-code ahg-face-status-hash 'default))
 
 
-(define-derived-mode ahg-status-mode nil "aHg-status"
+(define-derived-mode ahg-status-mode special-mode "aHg-status"
   "Major mode for *hg status* buffers.
 
 Commands:
@@ -1034,7 +1034,7 @@ flag to hg update."
 
 (defconst ahg-short-log-start-regexp "^ +\\([0-9]+\\) |")
 
-(define-derived-mode ahg-short-log-mode fundamental-mode "ahg-short-log"
+(define-derived-mode ahg-short-log-mode special-mode "ahg-short-log"
   "Major mode to display hg shortlog output.
 
 Commands:
@@ -1315,7 +1315,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
     )
   "Keywords in `ahg-log-mode' mode.")
 
-(define-derived-mode ahg-log-mode nil "ahg-log"
+(define-derived-mode ahg-log-mode special-mode "ahg-log"
   "Major mode to display hg log output.
 
 Commands:
@@ -1621,14 +1621,14 @@ prompts also for extra flags."
     )
   "Keywords in `ahg-glog-mode' mode.")
 
-(define-derived-mode ahg-glog-mode nil "ahg-glog"
+(define-derived-mode ahg-glog-mode special-mode "ahg-glog"
   "Major mode to display hg glog output.
 
 Commands:
 \\{ahg-glog-mode-map}
 "
   (buffer-disable-undo) ;; undo info not needed here
-        (setq truncate-lines t)
+  (setq truncate-lines t)
   (toggle-read-only t)
   (define-key ahg-glog-mode-map [?g] 'ahg-glog)
   (define-key ahg-glog-mode-map [?s] 'ahg-status)
@@ -1760,6 +1760,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
 Commands:
 \\{ahg-diff-mode-map}
 "
+  (put 'ahg-diff-mode 'mode-class 'special)
   (toggle-read-only t)
   (save-excursion
     (goto-char (point-min))
@@ -2560,7 +2561,7 @@ last refresh."
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]
     ))
 
-(define-derived-mode ahg-mq-patches-mode fundamental-mode "ahg-mq-patches"
+(define-derived-mode ahg-mq-patches-mode special-mode "ahg-mq-patches"
   "Major mode to display mq patch queues.
 
 Commands:
@@ -3225,7 +3226,7 @@ current hg command."
     (set-marker (process-mark process) (point))
     ))
 
-(define-derived-mode ahg-command-mode nil "aHg command"
+(define-derived-mode ahg-command-mode special-mode "aHg command"
   "Major mode for aHg commands.
 
 Commands:
