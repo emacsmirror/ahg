@@ -1482,10 +1482,9 @@ a prefix argument, prompts also for EXTRA-FLAGS."
         (let ((pt (posn-point (event-end event))))
           (goto-char pt)
           (let* ((r1 (ahg-log-revision-at-point t))
-                 (r2 (ahg-first-parent-of-rev r1)))
-            (ahg-diff
-             r2 r1
-             (list (ahg-log-filename-at-point pt)))))))
+                 (r2 (ahg-first-parent-of-rev r1))
+                 (fn (ahg-log-filename-at-point pt)))
+            (ahg-diff r2 r1 (list fn))))))
     (define-key map "f"
       (lambda ()
         (interactive)
@@ -1502,18 +1501,21 @@ a prefix argument, prompts also for EXTRA-FLAGS."
       (lambda ()
         (interactive)
           (let* ((r1 (ahg-log-revision-at-point t))
-                 (r2 (ahg-first-parent-of-rev r1)))
-            (ahg-diff r2 r1 (list (ahg-log-filename-at-point (point)))))))
+                 (r2 (ahg-first-parent-of-rev r1))
+                 (fn (ahg-log-filename-at-point (point))))
+            (ahg-diff r2 r1 (list fn)))))
     map))
 
 (defun ahg-log-filename-at-point (point)
   (interactive "d")
-  (save-excursion
-    (goto-char point)
-    (buffer-substring-no-properties
-     (+ 13 ;; (length "             ")
-        (point-at-bol))
-     (point-at-eol))))
+  (let ((fn 
+         (save-excursion
+           (goto-char point)
+           (buffer-substring-no-properties
+            (+ 13 ;; (length "             ")
+               (point-at-bol))
+            (point-at-eol)))))
+    (ahg-abspath fn)))
 
 (defun ahg-format-log-buffer ()
   (goto-char (point-min))
@@ -3310,6 +3312,11 @@ Commands:
     (let ((global-opts (when root (list "-R" root))))
       (when (= (ahg-call-process "qapplied" nil global-opts) 0)
         (> (buffer-size) 0)))))
+
+(defun ahg-abspath (pth &optional root)
+  (unless root
+    (setq root (ahg-root)))
+  (expand-file-name pth (file-name-as-directory root)))
 
 ;;-----------------------------------------------------------------------------
 ;; log-edit related functions
