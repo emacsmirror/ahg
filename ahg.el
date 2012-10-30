@@ -1745,7 +1745,14 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                   (propertize dn 'face ahg-header-line-root-face)
                   "\n\n")))
            (ahg-show-error process))))
-     buffer)))
+     buffer
+     nil ;; use-shell
+     nil ;; no-show-message
+     nil ;; report-untrusted
+     nil ;; filterfunc
+     nil ;; is-interactive
+     (list "--config" "extensions.hgext.graphlog=") ;; global-opts
+     )))
 
 (defun ahg-glog-update-to-rev ()
   (interactive)
