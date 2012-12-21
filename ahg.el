@@ -808,9 +808,10 @@ ahg-status, and it has an ewoc associated with it."
           (unless no-pop
             (pop-to-buffer outbuf))
           (set (make-local-variable 'ahg-window-configuration) cfg)
-          (let ((inhibit-read-only t)
-                (node (ewoc-nth ew 0)))
-            (when node (goto-char (ewoc-location node))))
+          (with-current-buffer outbuf
+            (let ((inhibit-read-only t)
+                  (node (ewoc-nth ew 0)))
+              (when node (goto-char (ewoc-location node)))))
           (when point-pos
             (with-current-buffer outbuf
               (ahg-goto-line-point point-pos)))
