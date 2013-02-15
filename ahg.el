@@ -2773,42 +2773,52 @@ about which are currently applied."
     (and node (caddr (ewoc-data node)))))
 
 
-(defun ahg-mq-patches-goto-patch (force)
+(defun ahg-mq-patches-goto-patch ()
   "Puts the patch at point in the patch list buffer on top of the
 stack of applied patches."
-  (interactive "P")
+  (interactive)
   (let* ((patch (ahg-mq-patches-patch-at-point))
-         (ok (and patch (ahg-y-or-n-p (format "Go to patch %s? " patch)))))
+         (ok (and patch (ahg-y-or-n-p (format "Go to patch %s? " patch))))
+         (force (and ok (ahg-uncommitted-changes-p)
+                     (ahg-y-or-n-p "Overwrite local changes? "))))
     (when ok
       (ahg-qgoto patch force))))
 
 
-(defun ahg-mq-patches-moveto-patch (force)
+(defun ahg-mq-patches-moveto-patch ()
   "Like `ahg-mq-patches-goto-patch', but reorder patch series and
 apply only the given patch."
-  (interactive "P")
+  (interactive)
   (let* ((patch (ahg-mq-patches-patch-at-point))
-         (ok (and patch (ahg-y-or-n-p (format "Move to patch %s? " patch)))))
+         (ok (and patch (ahg-y-or-n-p (format "Move to patch %s? " patch))))
+         (force (and ok (ahg-uncommitted-changes-p)
+                     (ahg-y-or-n-p "Overwrite local changes? "))))
     (when ok
       (ahg-qmove patch force))))
 
 
-(defun ahg-mq-patches-switchto-patch (force)
+(defun ahg-mq-patches-switchto-patch ()
   "Pop all applied patches and move to the given patch."
-  (interactive "P")
+  (interactive)
   (let* ((patch (ahg-mq-patches-patch-at-point))
-         (ok (and patch (ahg-y-or-n-p (format "Switch to patch %s? " patch)))))
+         (ok (and patch (ahg-y-or-n-p (format "Switch to patch %s? " patch))))
+         (force (and ok (ahg-uncommitted-changes-p)
+                     (ahg-y-or-n-p "Overwrite local changes? "))))
     (when ok
       (ahg-qswitch patch force))))
 
 
-(defun ahg-mq-patches-apply-patch (force)
+(defun ahg-mq-patches-apply-patch ()
   "Apply the given patch to the working copy, without modifying the repository."
-  (interactive "P")
+  (interactive)
   (let* ((patch (ahg-mq-patches-patch-at-point))
          (ok (and patch
                   (ahg-y-or-n-p
-                   (format "Apply patch %s to the working copy? " patch)))))
+                   (format "Apply patch %s to the working copy? " patch))))
+         (force (and
+                 ok (ahg-uncommitted-changes-p)
+                 (ahg-y-or-n-p
+                  "Working copy contains local changes, proceed anyway? "))))
     (when ok
       (ahg-qapply patch force))))
 
