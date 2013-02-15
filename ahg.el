@@ -2836,7 +2836,7 @@ apply only the given patch."
   (save-window-excursion
     (select-window (posn-window (event-end event)) t)
     (goto-char (posn-point (event-end event)))
-    (ahg-mq-patches-goto-patch nil)))
+    (ahg-mq-patches-goto-patch)))
 
 
 (defun ahg-mq-patches-delete-patch ()
