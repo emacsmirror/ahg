@@ -2885,7 +2885,12 @@ so that filename completion works on patch names."
                     (when (= (ahg-call-process "parents"
                                                (list "--template" "{node} ")
                                                (list "-R" root)) 0)
-                      (split-string (buffer-string))))))
+                      (split-string (buffer-string)))))
+         (addremove (with-temp-buffer
+                      (or (not (= (ahg-call-process "status"
+                                                    (list "-a" "-d" "-r")
+                                                    (list "-R" root)) 0))
+                          (> (buffer-size) 0)))))
     (cond (isthere
            ;; we don't want to overwrite old backups
            (error
@@ -2898,6 +2903,9 @@ so that filename completion works on patch names."
             (if (null parents)
                 "could not in determine parents of working dir, aborting"
               "uncommitted merge detected, aborting")))
+          (addremove
+           ;; pending additions/deletions are not supported
+           (error "pending additions and/or deletions detected, aborting"))
           (t
            ;; create the patch
            (let ((patchbuf (generate-new-buffer "*aHg-record*")))
