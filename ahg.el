@@ -1092,7 +1092,7 @@ Commands:
         
 (defun ahg-short-log-insert-contents (ewoc contents)
   (let ((lines (split-string contents "\n")))
-    (labels ((format-line (line)
+    (flet ((format-line (line)
                (if (and line (> (length line) 0))
                     (let* ((p1 (string-match " " line))
                            (p2 (string-match " " line (1+ p1)))
