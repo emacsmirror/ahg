@@ -2009,7 +2009,8 @@ that buffer is refreshed instead.)"
                           (ahg-dynamic-completion-table
                            ahg-complete-command-name))))
   (let ((buffer (get-buffer-create "*hg help*"))
-        (oldcols (getenv "COLUMNS")))
+        (oldcols (getenv "COLUMNS"))
+        (ahg-i18n t))
     (with-current-buffer buffer (let ((inhibit-read-only t)) (erase-buffer)))
     (setenv "COLUMNS" (format "%s" (window-width (selected-window))))
     (ahg-generic-command
