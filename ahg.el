@@ -383,6 +383,7 @@ Commands:
   (define-key ahg-status-mode-map "h" 'ahg-command-help)
   (define-key ahg-status-mode-map "$" 'ahg-status-shell-command)
   (define-key ahg-status-mode-map "F" 'ahg-status-dired-find)
+  (define-key ahg-status-mode-map "d" 'ahg-status-delete)
   (let ((showmap (make-sparse-keymap)))
     (define-key showmap "s" 'ahg-status-show-default)
     (define-key showmap "A" 'ahg-status-show-all)
@@ -735,6 +736,20 @@ the file on the current line."
 (defun ahg-status-diff-all ()
   (interactive)
   (ahg-status-diff t))
+
+(defun ahg-status-delete ()
+  (interactive)
+  (let ((files (ahg-status-get-marked 'cur)))
+    (if files
+	(if (ahg-y-or-n-p 
+	     (if (> (length files) 1)
+		 (format "Delete %d files?" (length files))
+	       (format "Delete %s?" (cddar files))))
+	    (progn
+	      (mapcar 'delete-file (mapcar 'cddr files))
+	      (ahg-status-refresh))
+	  (message "delete aborted!"))
+      (message "0 files selected, nothing deleted"))))
 
 (defun ahg-status-undo ()
   (interactive)
