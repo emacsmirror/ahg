@@ -737,6 +737,7 @@ the file on the current line."
   (interactive)
   (ahg-status-diff t))
 
+
 (defun ahg-status-delete ()
   (interactive)
   (let ((files (ahg-status-get-marked 'cur)))
@@ -746,10 +747,11 @@ the file on the current line."
 		 (format "Delete %d files?" (length files))
 	       (format "Delete %s?" (cddar files))))
 	    (progn
-	      (mapcar 'delete-file (mapcar 'cddr files))
+	      (mapc 'delete-file (mapcar 'cddr files))
 	      (ahg-status-refresh))
 	  (message "delete aborted!"))
       (message "0 files selected, nothing deleted"))))
+
 
 (defun ahg-status-undo ()
   (interactive)
