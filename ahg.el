@@ -744,8 +744,8 @@ the file on the current line."
     (if files
 	(if (ahg-y-or-n-p 
 	     (if (> (length files) 1)
-		 (format "Delete %d files?" (length files))
-	       (format "Delete %s?" (cddar files))))
+		 (format "Delete %d files? " (length files))
+	       (format "Delete %s? " (cddar files))))
 	    (progn
 	      (mapc 'delete-file (mapcar 'cddr files))
 	      (ahg-status-refresh))
