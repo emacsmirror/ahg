@@ -60,6 +60,7 @@
                       ["Commit Current File" ahg-commit-cur-file t]
                       ["View Changes of Current File" ahg-diff-cur-file t]
                       ["View Change Log of Current File" ahg-log-cur-file t]
+                      ["Revert Current File" ahg-revert-cur-file t]
                       ["Grep the Working Directory" ahg-manifest-grep t]
                       ["--" nil nil]
                       ("Mercurial Queues"
@@ -93,6 +94,7 @@
     (define-key map "h" 'ahg-command-help)
     (define-key map "c" 'ahg-commit-cur-file)
     (define-key map "=" 'ahg-diff-cur-file)
+    (define-key map "r" 'ahg-revert-cur-file)
     (define-key map "f" 'ahg-manifest-grep)
     (define-key map (kbd "C-l") 'ahg-log-cur-file)
     (define-key map "Q"
@@ -436,6 +438,7 @@ Commands:
     ["Add/Remove" ahg-status-addremove [:keys "A" :active t]]
     ["Add to .hgignore" ahg-status-add-to-hgignore [:keys "I" :active t]]
     ["Undo" ahg-status-undo [:keys "U" :active t]]
+    ["Delete" ahg-status-delete [:keys "d" :active t]]
     ["Hg Command" ahg-status-do-command [:keys "!" :active t]]
     ["Shell Command" ahg-status-shell-command [:keys "$" :active t]]
     ["--" nil nil]
@@ -768,6 +771,18 @@ the file on the current line."
                    (kill-buffer nil))
                (ahg-show-error process)))))
       (message "hg revert aborted"))))                         
+
+(defun ahg-revert-cur-file ()
+  "Reverts the current file"
+  (interactive)
+  (cond ((buffer-file-name)
+	 (if (ahg-y-or-n-p (concat "Revert " (buffer-file-name)))
+	     (ahg-generic-command 
+	      "revert" (list (buffer-file-name))
+              (lambda (process status)
+                (if (string= status "finished\n")
+                    (revert-buffer nil t))))
+           (message "hg revert aborted")))))
 
 
 (defun ahg-get-status-ewoc (root)
