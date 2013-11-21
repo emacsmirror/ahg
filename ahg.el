@@ -2070,6 +2070,10 @@ that buffer is refreshed instead.)"
 (defvar ahg-manifest-grep-pattern-history nil
   "History for patterns of `ahg-manifest-grep'.")
 
+(defun ahg-grep-regexp-quote (s)
+  (replace-regexp-in-string "[()]" (lambda (m) (concat "\\\\" m))
+                            (regexp-quote s)))
+
 (defun ahg-manifest-grep (pattern glob)
   "Search for grep-like pattern in the working directory, considering only
 the files under version control."
@@ -2077,10 +2081,10 @@ the files under version control."
    (list
     (let* ((default
              (cond ((and mark-active transient-mark-mode)
-                    (regexp-quote (buffer-substring (region-beginning)
-                                                    (region-end))))
+                    (ahg-grep-regexp-quote (buffer-substring (region-beginning)
+                                                             (region-end))))
                    ((symbol-at-point)
-                    (regexp-quote (format "%s" (symbol-at-point))))
+                    (ahg-grep-regexp-quote (format "%s" (symbol-at-point))))
                    (t (car ahg-manifest-grep-pattern-history))))
            (input (read-string
                    (if default
