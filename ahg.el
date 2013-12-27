@@ -2182,8 +2182,8 @@ the line"
      (word-at-point)))
 
 (defun ahg-annotate-line-at-line ()
-  "Return the revision of the current line.  It is located in the second word in
-the line"
+  "Return the line number at the first appearance of the current line.  It is 
+stored in a text property."
   (save-excursion
      (beginning-of-line)
      (string-to-number (get-text-property (point) 'ahg-line-number))))
