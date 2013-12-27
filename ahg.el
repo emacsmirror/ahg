@@ -1855,8 +1855,9 @@ a prefix argument, prompts also for EXTRA-FLAGS."
 ;;-----------------------------------------------------------------------------
 
 (defun ahg-remove-control-M ()
-  "Remove ^M at end of line in the whole buffer.  This is done in ahg-dif-mode
-so that extra ^M's are not added when applying hunks with C-c C-a"
+  "Remove ^M at end of line in the whole buffer.  This is done in ahg-diff-mode
+so that extra ^M's are not added when applying hunks with C-c C-a.  Plus it 
+is a lot more readable without the ^M's getting in the way."
   (save-match-data
     (save-excursion
       (let ((remove-count 0))
