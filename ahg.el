@@ -805,6 +805,8 @@ the file on the current line."
         (message "hg rm aborted")))))
 
 (defun ahg-status-merge ()
+  "Runs hg merge on the repo.  Called when user clicks on or presses RET on 
+the `merge' text in the status view. See propertize-summary-info below." 
   (interactive)
   (lexical-let ((status-buffer (current-buffer))
                 (merge-buffer 
@@ -823,6 +825,9 @@ the file on the current line."
      merge-buffer)))
 
 (defun propertize-summary-info (summary)
+  "If the repo is in need of a merge, then the summary info will contain the
+text `heads (merge)'.  This function makes that text active, so that clicking
+it or pressing RET on it will initiate a merge."
   (let ((map (make-sparse-keymap)))
     (define-key map [mouse-1] 'ahg-status-merge)
     (define-key map (kbd "RET") 'ahg-status-merge)
@@ -1850,7 +1855,8 @@ a prefix argument, prompts also for EXTRA-FLAGS."
 ;;-----------------------------------------------------------------------------
 
 (defun ahg-remove-control-M ()
-  "Remove ^M at end of line in the whole buffer."
+  "Remove ^M at end of line in the whole buffer.  This is done in ahg-dif-mode
+so that extra ^M's are not added when applying hunks with C-c C-a"
   (save-match-data
     (save-excursion
       (let ((remove-count 0))
