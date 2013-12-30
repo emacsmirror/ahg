@@ -1860,12 +1860,10 @@ so that extra ^M's are not added when applying hunks with C-c C-a.  Plus it
 is a lot more readable without the ^M's getting in the way."
   (save-match-data
     (save-excursion
-      (let ((remove-count 0))
-        (goto-char (point-min))
-        (while (re-search-forward (concat (char-to-string 13) "$") 
-                                  (point-max) t)
-          (setq remove-count (+ remove-count 1))
-          (replace-match "" nil nil))))))
+      (goto-char (point-min))
+      (while (re-search-forward (concat (char-to-string 13) "$") 
+                                (point-max) t)
+        (replace-match "")))))
 
 (define-derived-mode ahg-diff-mode diff-mode "aHg Diff"
   "Special Diff mode for aHg buffers.
