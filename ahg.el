@@ -1854,7 +1854,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
 ;; hg diff
 ;;-----------------------------------------------------------------------------
 
-(defun ahg-remove-control-M ()
+(defun ahg-remove-^M ()
   "Remove ^M at end of line in the whole buffer.  This is done in ahg-diff-mode
 so that extra ^M's are not added when applying hunks with C-c C-a.  Plus it 
 is a lot more readable without the ^M's getting in the way."
@@ -1875,7 +1875,7 @@ Commands:
 "
   (put 'ahg-diff-mode 'mode-class 'special)
   ; Remove trailing ^M's.  Without this, ^M's are inserted when applying hunks.
-  (ahg-remove-control-M)
+  (ahg-remove-^M)
   (toggle-read-only t)
   (save-excursion
     (goto-char (point-min))
