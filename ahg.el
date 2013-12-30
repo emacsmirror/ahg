@@ -2022,14 +2022,8 @@ used.
         
         (ahg-generic-command
          "log" 
-         ;; Some serious escaping hell here.  This line logs the revision and
-         ;; description for each change set.  It surrounds the chaneset
-         ;; description with double-quotes, and then escapes backslashes and 
-         ;; quotes in the description so that it can be consumed as a lisp 
-         ;; string. 
          (append
-          (list  "--template '{rev} \"{sub(r'\\''\"'\\'',r'\\''\\\\\"'\\'',\
-sub(r'\\''\\\\'\\'',r'\\''\\\\\\\\'\\'',desc|firstline))}\"\\n'" file)
+          (list  "--template" "{rev} {desc|firstline))}\\n" file)
           (when rev (list "-r" (concat rev ":0" )))
           )
          (lambda (process status)
@@ -2046,11 +2040,17 @@ sub(r'\\''\\\\'\\'',r'\\''\\\\\\\\'\\'',desc|firstline))}\"\\n'" file)
                       (let ((rev (word-at-point)))
                         (if rev (string-to-number (word-at-point)) 0)))
                  (goto-char (point-min))
-                 (insert 
-                  "(set 'ahg-changeset-descriptions #s(hash-table data (")
-                 (goto-char (point-max))
-                 (insert ")))")
-                 (eval-buffer)
+                 (setq ahg-changeset-descriptions (make-hash-table))
+                 (while (not (eobp))
+                   (let ((rev (word-at-point)))
+                     (when rev
+                       (setq rev (string-to-number (word-at-point)))
+                       (forward-word)
+                       (puthash rev 
+                                (buffer-substring-no-properties (point)
+                                                                (point-at-eol))
+                                ahg-changeset-descriptions))
+                     (forward-line)))
                  (erase-buffer)
                  (ahg-generic-command
                   "annotate" 
@@ -2107,7 +2107,8 @@ Commands:
   (set (make-local-variable 'truncate-lines) t)
   (set (make-local-variable 'font-lock-defaults)
        '(ahg-annotate-font-lock-keywords t))
-  (hack-dir-local-variables-non-file-buffer)
+  (when (fboundp 'hack-dir-local-variables-non-file-buffer)
+    (hack-dir-local-variables-non-file-buffer))
 
   (define-key ahg-annotate-mode-map "=" 'ahg-annotate-diff)
   (define-key ahg-annotate-mode-map "l" 'ahg-annotate-log)
@@ -2152,7 +2153,7 @@ displays the changeset description.
 
 Colors range from purple for old revisions to red for recent revisions."
   (setq rev (string-to-number rev))
-  (let* ((color (hexrgb-hsv-to-hex 
+  (let* ((color (ahg-hsv-to-hex 
                  (* .7 ; Using .7 here omits the ambiguous pinks
                     (/ (- ahg-annotate-max-revision (float rev)) 
                        (max 1 ; avoid divide by zero with this
@@ -3599,6 +3600,8 @@ diff on large files.
         (temp-file (if use-temp-file (make-temp-file "ahg" ))))
     (unless no-hgplain (setenv "HGPLAIN" "1"))
     (unless ahg-i18n (setenv "LANG"))
+    (when (and (not use-shell) use-temp-file)
+      (setq args (mapcar 'shell-quote-argument args)))
     (let ((process
            (apply (if (or use-shell use-temp-file) 
                       'start-process-shell-command 
@@ -3766,6 +3769,47 @@ Commands:
   (unless root
     (setq root (ahg-root)))
   (expand-file-name pth (file-name-as-directory root)))
+
+;; adapted from hexrgb-hsv-to-hex in hexrgb.el
+;; Copyright (C) 2004-2014, Drew Adams, all rights reserved.
+;; licensed under the GPL
+(defun ahg-hsv-to-hex (hue saturation value)
+  (let (red green blue int-hue fract pp qq tt ww)
+    (if (< saturation 1.0e-8)
+        (setq red    value
+              green  value
+              blue   value)             ; Gray
+      (setq hue      (* hue 6.0)        ; Sectors: 0 to 5
+            int-hue  (floor hue)
+            fract    (- hue int-hue)
+            pp       (* value (- 1 saturation))
+            qq       (* value (- 1 (* saturation fract)))
+            ww       (* value (- 1 (* saturation (- 1 (- hue int-hue))))))
+      (case int-hue
+        ((0 6) (setq red    value
+                     green  ww
+                     blue   pp))
+        (1 (setq red    qq
+                 green  value
+                 blue   pp))
+        (2 (setq red    pp
+                 green  value
+                 blue   ww))
+        (3 (setq red    pp
+                 green  qq
+                 blue   value))
+        (4 (setq red    ww
+                 green  pp
+                 blue   value))
+        (otherwise (setq red    value
+                         green  pp
+                         blue   qq))))
+    (flet ((int-to-hex (int) (substring (format "%04X" int) (- 4)))
+           (scale (x) (floor (* x 65535.0))))
+      (concat "#"
+              (int-to-hex (scale red))
+              (int-to-hex (scale green))
+              (int-to-hex (scale blue))))))
 
 ;;-----------------------------------------------------------------------------
 ;; log-edit related functions
