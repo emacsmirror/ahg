@@ -1,6 +1,6 @@
 ;;; ahg.el --- Alberto's Emacs interface for Mercurial (Hg)
 
-;; Copyright (C) 2008-2013 Alberto Griggio
+;; Copyright (C) 2008-2014 Alberto Griggio
 
 ;; Author: Alberto Griggio <agriggio@users.sourceforge.net>
 ;; URL: https://bitbucket.org/agriggio/ahg
@@ -245,6 +245,14 @@ For `nil' the default file is used."
   '((default (:inherit font-lock-keyword-face)))
   "Face for tags and branches in aHg log buffers." :group 'ahg)
 
+(defface ahg-log-phase-draft-face
+  '((default (:inherit font-lock-preprocessor-face)))
+  "Face for draft phase in aHg log buffers." :group 'ahg)
+
+(defface ahg-log-phase-secret-face
+  '((default (:inherit font-lock-comment-face)))
+  "Face for secret phase in aHg log buffers." :group 'ahg)
+
 (defface ahg-short-log-user-face
   '((default (:inherit font-lock-type-face)))
   "Face for user field in aHg short log buffers." :group 'ahg)
@@ -274,6 +282,8 @@ For `nil' the default file is used."
 (defvar ahg-log-field-face 'ahg-log-field-face)
 (defvar ahg-log-branch-face 'ahg-log-branch-face)
 (defvar ahg-log-revision-face 'ahg-log-revision-face)
+(defvar ahg-log-phase-draft-face 'ahg-log-phase-draft-face)
+(defvar ahg-log-phase-secret-face 'ahg-log-phase-secret-face)
 (defvar ahg-short-log-user-face 'ahg-short-log-user-face)
 (defvar ahg-header-line-face 'ahg-header-line-face)
 (defvar ahg-header-line-root-face 'ahg-header-line-root-face)
@@ -1388,7 +1398,9 @@ a prefix argument, prompts also for EXTRA-FLAGS."
   '(("^hg \\<[a-z]+\\> for" . ahg-header-line-face)
     ("^hg \\<[a-z]+\\> for \\(.*\\)" 1 ahg-header-line-root-face)
     ("^changeset:" . ahg-log-field-face)
+    ("^phase:" . ahg-log-field-face)
     ("^tag:" . ahg-log-field-face)
+    ("^bookmark:" . ahg-log-field-face)
     ("^user:" . ahg-log-field-face)
     ("^date:" . ahg-log-field-face)
     ("^summary:" . ahg-log-field-face)
@@ -1397,7 +1409,9 @@ a prefix argument, prompts also for EXTRA-FLAGS."
     ("^parent:" . ahg-log-field-face)
     ("^description:" . ahg-log-field-face)
     ("^\\(changeset\\|parent\\): +\\(.+\\)$" 2 ahg-log-revision-face)
-    ("^\\(tag\\|branch\\): +\\(.+\\)$" 2 ahg-log-branch-face)
+    ("^\\(tag\\|branch\\|bookmark\\): +\\(.+\\)$" 2 ahg-log-branch-face)
+    ("^phase: +\\(draft\\)$" 1 ahg-log-phase-draft-face)
+    ("^phase: +\\(secret\\)$" 1 ahg-log-phase-secret-face)
     ("^user: +\\(.+\\)$" 1 ahg-short-log-user-face)
     ("^date: +\\(.+\\)$" 1 ahg-short-log-date-face)
     )
@@ -1498,7 +1512,7 @@ buffer, do nothing."
 (defvar ahg-dir-name-for-log-command nil)
 
 (defconst ahg-log-style-map
-  "changeset = \"{rev}:{node|short}\\n{branches}\\n{tags}\\n{parents}\\n{author}\\n{date|date}\\n{files}\\n\\t{desc|tabindent}\\n\"
+  "changeset = \"{rev}:{node|short}\\n{phase}\\n{branches}\\n{tags}\\n{bookmarks}\\n{parents}\\n{author}\\n{date|date}\\n{files}\\n\\t{desc|tabindent}\\n\"
 file = \"{file}\\n\"
 ")
 
@@ -1613,15 +1627,21 @@ a prefix argument, prompts also for EXTRA-FLAGS."
   (let ((inhibit-read-only t))
     (labels ((next () (beginning-of-line) (forward-line 1)))
       (while (not (eobp))
-        ;; first line, changeset
+        ;; changeset
         (insert "changeset:   ")
         (next)
-        ;; second line, branch
+        ;; phase
+        (if (looking-at "^public$")
+            (let ((kill-whole-line t))
+              (kill-line))
+          (insert "phase:       ")
+          (next))
+        ;; branch
         (if (looking-at "^$")
             (delete-char 1)
           (insert "branch:      ")
           (next))
-        ;; third line, tags
+        ;; tags
         (if (looking-at "^$")
             (delete-char 1) ;; remove empty line
           ;; otherwise, insert a "tag: " entry for each entry in the list
@@ -1630,7 +1650,16 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                 (kill-whole-line t))
             (kill-line)
             (mapc (lambda (tag) (insert "tag:         " tag "\n")) tags)))
-        ;; fourth line, parents
+        ;; bookmarks
+        (if (looking-at "^$")
+            (delete-char 1) ;; remove empty line
+          ;; otherwise, insert a "bookmark: " entry for each entry in the list
+          (let ((tags (split-string (buffer-substring-no-properties
+                                     (point-at-bol) (point-at-eol))))
+                (kill-whole-line t))
+            (kill-line)
+            (mapc (lambda (tag) (insert "bookmark:    " tag "\n")) tags)))
+        ;; parents
         (if (looking-at "^$")
             (delete-char 1) 
           (let ((parents (split-string (buffer-substring-no-properties
@@ -1638,13 +1667,13 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                 (kill-whole-line t))
             (kill-line)
             (mapc (lambda (p) (insert "parent:      " p "\n")) parents)))
-        ;; fifth line, user
+        ;; user
         (insert "user:        ")
         (next)
-        ;; sixth line, date
+        ;; date
         (insert "date:        ")
         (next)
-        ;; seventh line, files, until an empty line is found
+        ;; files, until an empty line is found
         (unless (looking-at "^$")
           (set-text-properties (point-at-bol) (point-at-eol)
                                (list 'mouse-face 'highlight
@@ -1701,17 +1730,17 @@ prompts also for extra flags."
     ("^\\([+|@o\\\\/ -]\\)+[0-9]+  \\([0-9a-f]+\\)" 2 ahg-log-revision-face)
     ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  \\([^ ]+\\)"
      2 ahg-short-log-date-face)
-    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  \\([^ ]+\\)" 2
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  \\([^ ]+\\) " 2
      ahg-short-log-user-face)
-    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  \\(\\[[^]]+\\]\\)"
-     2 ahg-log-branch-face) ;; tags
-    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  \\(\\[\\]\\)" 2
-     ahg-invisible-face) ;; empty tags
-    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  [^ ]+ \\(([^)]+)\\)$"
-     2 ahg-log-branch-face) ;; branches
-    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  [^ ]+ \\(()\\)$" 2
-     ahg-invisible-face) ;; empty branches    
-    )
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  \\(draft\\)"
+     2 ahg-log-phase-draft-face)
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  \\(secret\\)"
+     2 ahg-log-phase-secret-face)
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  \\(draft  \\|secret  \\)?\\([([{].+\\)[.]$"
+     3 ahg-log-branch-face) ;; tags, bookmarks, branches
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  [^ ]+  [^ ]+  \\([([{].+\\)[.]$"
+     2 ahg-log-branch-face) ;; tags, bookmarks, branches
+    ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  .*\\([.]\\)$" 2 ahg-invisible-face))
   "Keywords in `ahg-glog-mode' mode.")
 
 (define-derived-mode ahg-glog-mode special-mode "ahg-glog"
@@ -1813,7 +1842,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
     (setq command-list
           (append command-list
                   (list "--template"
-                        "{rev}  {node|short}  {date|shortdate}  {author|user}  [{tags}] ({branches})\\n  {desc|firstline}\\n\\n")
+                        "{rev}  {node|short}  {date|shortdate}  {author|user}  {ifeq(phase, 'public', '', '{phase}  ')}{if(tags, '[{tags}]  ', ' ')}{if(bookmarks, '\{{bookmarks}}  ')}{if(branches, '({branches})')}.\\n  {desc|firstline}\\n\\n")
                   (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
