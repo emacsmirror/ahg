@@ -1842,7 +1842,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
     (setq command-list
           (append command-list
                   (list "--template"
-                        "{rev}  {node|short}  {date|shortdate}  {author|user}  {ifeq(phase, 'public', '', '{phase}  ')}{if(tags, '[{tags}]  ', ' ')}{if(bookmarks, '\{{bookmarks}}  ')}{if(branches, '({branches})')}.\\n  {desc|firstline}\\n\\n")
+                        "{rev}  {node|short}  {date|shortdate}  {author|user}  {ifeq(phase, 'public', '', '{phase}  ')}{if(tags, '[{tags}]  ', ' ')}{if(bookmarks, '\\{{bookmarks}}  ')}{if(branches, '({branches})')}.\\n  {desc|firstline}\\n\\n")
                   (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
