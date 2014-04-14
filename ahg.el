@@ -1074,6 +1074,7 @@ Uses find-dired to get them into nicely."
 ;;-----------------------------------------------------------------------------
 
 (defvar ahg-update-to-rev-get-revision-function nil)
+(defvar ahg-update-to-rev-check-bookmarks nil)
 
 (defun ahg-update-to-rev (rev force)
   "Update to the given revision. If force is non-nil, pass -C
@@ -1086,17 +1087,28 @@ flag to hg update."
                             t))))
      (list (and ans rev) overw)))
   (when rev
-    (ahg-generic-command
-     "update" (if force (list "-C" "-r" rev) (list "-r" rev))
-     (lexical-let ((aroot default-directory)
-                   (rev rev))
-       (lambda (process status)
-         (if (string= status "finished\n")
-             (progn
-               (ahg-status-maybe-refresh aroot)
-               (message "Updated to revision %s" rev)
-               (kill-buffer (process-buffer process)))
-           (ahg-show-error process)))))))
+    (let ((args (if force (list "-C" "-r" rev) (list "-r" rev))))
+      ;; check if there is a bookmark
+      (when ahg-update-to-rev-check-bookmarks
+        (let* ((bmarks (ahg-get-bookmarks rev))
+               (n (length bmarks)))
+          (cond ((= n 1)
+                 (let ((bm (car bmarks)))
+                   (message "Activating bookmark %s" bm)
+                   (setq args (if force (list "-C" bm) (list bm)))))
+                ((> n 1)
+                 (message "Warning: more than 1 bookmark at rev %s, not making any of them active" rev)))))
+      (ahg-generic-command
+       "update" args
+       (lexical-let ((aroot default-directory)
+                     (rev rev))
+         (lambda (process status)
+           (if (string= status "finished\n")
+               (progn
+                 (ahg-status-maybe-refresh aroot)
+                 (message "Updated to revision %s" rev)
+                 (kill-buffer (process-buffer process)))
+             (ahg-show-error process))))))))
 
 
 ;;-----------------------------------------------------------------------------
@@ -1268,7 +1280,8 @@ do nothing."
 (defun ahg-short-log-update-to-rev ()
   (interactive)
   (let ((ahg-update-to-rev-get-revision-function
-         'ahg-short-log-revision-at-point))
+         'ahg-short-log-revision-at-point)
+        (ahg-update-to-rev-check-bookmarks t))
     (call-interactively 'ahg-update-to-rev)))
 
 
@@ -1715,7 +1728,8 @@ prompts also for extra flags."
 
 (defun ahg-log-update-to-rev ()
   (interactive)
-  (let ((ahg-update-to-rev-get-revision-function 'ahg-log-revision-at-point))
+  (let ((ahg-update-to-rev-get-revision-function 'ahg-log-revision-at-point)
+        (ahg-update-to-rev-check-bookmarks t))
     (call-interactively 'ahg-update-to-rev)))
 
 ;;-----------------------------------------------------------------------------
@@ -1842,7 +1856,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
     (setq command-list
           (append command-list
                   (list "--template"
-                        "{rev}  {node|short}  {date|shortdate}  {author|user}  {ifeq(phase, 'public', '', '{phase}  ')}{if(tags, '[{tags}]  ', ' ')}{if(bookmarks, '\\{{bookmarks}}  ')}{if(branches, '({branches})')}.\\n  {desc|firstline}\\n\\n")
+                        "{rev}  {node|short}  {date|shortdate}  {author|user}  {ifeq(phase, 'public', '', '{phase}  ')}{if(tags, '[{tags}]  ')}{if(bookmarks, '\\{{bookmarks}}  ')}{if(branches, '({branches})')}.\\n  {desc|firstline}\\n\\n")
                   (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
@@ -1876,7 +1890,8 @@ a prefix argument, prompts also for EXTRA-FLAGS."
 
 (defun ahg-glog-update-to-rev ()
   (interactive)
-  (let ((ahg-update-to-rev-get-revision-function 'ahg-glog-revision-at-point))
+  (let ((ahg-update-to-rev-get-revision-function 'ahg-glog-revision-at-point)
+        (ahg-update-to-rev-check-bookmarks t))
     (call-interactively 'ahg-update-to-rev)))
 
 ;;-----------------------------------------------------------------------------
@@ -3839,6 +3854,14 @@ Commands:
               (int-to-hex (scale red))
               (int-to-hex (scale green))
               (int-to-hex (scale blue))))))
+
+(defun ahg-get-bookmarks (rev)
+  (with-temp-buffer
+    (let ((process-environment (cons "LANG=" process-environment)))
+      (if (= (ahg-call-process "log"
+                               (list "-r" rev "--template" "{bookmarks}")) 0)
+          (split-string (buffer-string))
+        nil))))
 
 ;;-----------------------------------------------------------------------------
 ;; log-edit related functions
