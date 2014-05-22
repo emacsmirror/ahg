@@ -193,6 +193,10 @@ when calling hg. This might not always work."
 For `nil' the default file is used."
   :group 'ahg :type 'string)
 
+(defcustom ahg-summary-remote nil
+  "If true, pass --remote to summary command used by ahg-status"
+  :group 'ahg :type 'boolean)
+
 (defface ahg-status-marked-face
   '((default (:inherit font-lock-preprocessor-face)))
   "Face for marked files in aHg status buffers." :group 'ahg)
@@ -335,8 +339,15 @@ the current dir is not under hg."
 (defun ahg-summary-info (root)
   (with-temp-buffer
     (let ((status (let ((default-directory (file-name-as-directory root)))
-                    (ahg-call-process "summary" nil))))
-      (if (= status 0)
+                    (ahg-call-process 
+                     "summary" 
+                     (when ahg-summary-remote (list "--remote"))))))
+      ;; failure could mean the summary command wasn't available
+      ;; it could also mean communication with the remote repo was unsuccesful
+      ;; If we can find the word "update: " in the output, we'll assume it
+      ;; failed connecting to remote repo, but rest of summary is there.
+      (if (or (= status 0) 
+              (and ahg-summary-remote (re-search-backward "^update: " nil t)))
           (buffer-substring-no-properties (point-min) (1- (point-max)))
         ;; if hg summary is not available, fall back to hg identify
         (ahg-identify root)))))
