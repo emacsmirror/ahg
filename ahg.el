@@ -2469,7 +2469,7 @@ that buffer is refreshed instead.)"
     (with-current-buffer buffer (let ((inhibit-read-only t)) (erase-buffer)))
     (setenv "COLUMNS" (format "%s" (window-width (selected-window))))
     (ahg-generic-command
-     "help" (list command)
+     "help" (split-string command)
      (lambda (process status)
        (if (string= status "finished\n")
            (progn
