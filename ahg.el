@@ -1112,11 +1112,12 @@ flag to hg update."
       (ahg-generic-command
        "update" args
        (lexical-let ((aroot default-directory)
-                     (rev rev))
+                     (rev rev)
+                     (refresh (symbol-function 'ahg-status-maybe-refresh)))
          (lambda (process status)
            (if (string= status "finished\n")
                (progn
-                 (ahg-status-maybe-refresh aroot)
+                 (funcall refresh aroot)
                  (message "Updated to revision %s" rev)
                  (kill-buffer (process-buffer process)))
              (ahg-show-error process))))))))
@@ -1903,7 +1904,31 @@ a prefix argument, prompts also for EXTRA-FLAGS."
   (interactive)
   (let ((ahg-update-to-rev-get-revision-function 'ahg-glog-revision-at-point)
         (ahg-update-to-rev-check-bookmarks t))
-    (call-interactively 'ahg-update-to-rev)))
+    (lexical-let ((refresh 'ahg-status-maybe-refresh)
+                  (buf (current-buffer)))
+      (flet
+          ((ahg-status-maybe-refresh (root)
+                (let ((inhibit-read-only t))
+                   (save-excursion
+                     (goto-char (point-min))
+                     (let ((cont
+                            (re-search-forward ahg-glog-start-regexp nil t)))
+                     (while cont
+                       (beginning-of-line)
+                       (if (re-search-forward "@" cont t)
+                           (progn
+                             (setq cont nil)
+                             (replace-match "o"))
+                         (end-of-line)
+                         (setq cont
+                               (re-search-forward ahg-glog-start-regexp
+                                                  nil t))))))
+                   (save-excursion
+                     (beginning-of-line)
+                     (re-search-forward "o")
+                     (replace-match "@")))
+                (funcall refresh root)))
+        (call-interactively 'ahg-update-to-rev)))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg diff
