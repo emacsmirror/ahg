@@ -1423,6 +1423,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
   '(("^hg \\<[a-z]+\\> for" . ahg-header-line-face)
     ("^hg \\<[a-z]+\\> for \\(.*\\)" 1 ahg-header-line-root-face)
     ("^changeset:" . ahg-log-field-face)
+    ("^svn:" . ahg-log-field-face)
     ("^phase:" . ahg-log-field-face)
     ("^tag:" . ahg-log-field-face)
     ("^bookmark:" . ahg-log-field-face)
@@ -1537,7 +1538,7 @@ buffer, do nothing."
 (defvar ahg-dir-name-for-log-command nil)
 
 (defconst ahg-log-style-map
-  "changeset = \"{rev}:{node|short}\\n{phase}\\n{branches}\\n{tags}\\n{bookmarks}\\n{parents}\\n{author}\\n{date|date}\\n{files}\\n\\t{desc|tabindent}\\n\"
+  "changeset = \"{rev}:{node|short}\\n{svnrev}\\n{phase}\\n{branches}\\n{tags}\\n{bookmarks}\\n{parents}\\n{author}\\n{date|date}\\n{files}\\n\\t{desc|tabindent}\\n\"
 file = \"{file}\\n\"
 ")
 
@@ -1655,6 +1656,11 @@ a prefix argument, prompts also for EXTRA-FLAGS."
         ;; changeset
         (insert "changeset:   ")
         (next)
+        ;; svn rev
+        (if (looking-at "^$")
+            (delete-char 1)
+          (insert "svn:         ")
+          (next))
         ;; phase
         (if (looking-at "^public$")
             (let ((kill-whole-line t))
