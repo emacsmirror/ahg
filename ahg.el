@@ -2328,30 +2328,32 @@ Lets you step back in time for that line."
 (defun ahg-complete-command-name (command)
   (with-temp-buffer
     (let ((process-environment (cons "LANG=" process-environment)))
-      (if (= (ahg-call-process "debugcomplete") 0)
+      (if (= (ahg-call-process "debugcomplete" (list command)) 0)
           ;; first, we try the built-in autocompletion of mercurial
           (let (out)
             (goto-char (point-min))
             (while (not (eobp))
               (setq out
                     (cons
-                     (buffer-substring-no-properties
-                      (point-at-bol) (point-at-eol))
+                     (concat (buffer-substring-no-properties
+                              (point-at-bol) (point-at-eol)) " ")
                      out))
               (forward-line 1))
-            (if out (nreverse out) (list command)))
+            (if out (nreverse out) (list (concat command " "))))
         ;; if this fails, we return the string itself as a match
-        (list command)))))
+        (list (concat command " "))))))
 
 (defvar ahg-complete-command-directory-for-filename-completion nil)
 
 (defun ahg-complete-command (command)
   ;; we split the string, and treat the last word as a filename
   (let* ((idx (string-match "\\([^ ]+\\)$" command))
+         (cmd (if idx (substring command idx) ""))
          (matches
-          (cond ((= idx 0) (ahg-complete-command-name command))
+          (cond ((string-match "^-.*$" cmd) (list cmd))
+                ((= idx 0) (ahg-complete-command-name command))
                 ((and (= idx 5) (string= (substring command 0 idx) "help "))
-                 (ahg-complete-command-name (substring command idx)))
+                 (ahg-complete-command-name cmd))
                 (t
                  (let ((default-directory
                          (or
