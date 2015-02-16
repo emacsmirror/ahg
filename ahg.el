@@ -1141,6 +1141,13 @@ flag to hg update."
     (define-key map [?q] 'ahg-buffer-quit)
     (define-key map [?!] 'ahg-do-command)
     (define-key map [?h] 'ahg-command-help)
+    (let ((emap (make-sparse-keymap)))
+      (define-key emap "m" 'ahg-short-log-histedit-mess)
+      (define-key emap "d" 'ahg-short-log-histedit-drop)
+      (define-key emap "x" 'ahg-short-log-histedit-xtract)
+      (define-key emap "f" 'ahg-short-log-histedit-fold)
+      (define-key emap "r" 'ahg-short-log-histedit-roll)
+      (define-key map "E" emap))
     map)
   "Keymap used in `ahg-short-log-mode'.")
 
@@ -1182,6 +1189,13 @@ Commands:
     ["Next Revision" ahg-short-log-next [:keys "n" :active t]]
     ["Previous Revision" ahg-short-log-previous [:keys "p" :active t]]
     ["Go to Revision..." ahg-short-log-goto-revision [:keys "r" :active t]]
+    ["--" nil nil]
+    ("History Editing"
+     ["Edit Changeset Message" ahg-short-log-histedit-mess [:keys "Em" :active t]]
+     ["Drop Changeset" ahg-short-log-histedit-drop [:keys "Ed" :active t]]
+     ["Extract Changeset" ahg-short-log-histedit-xtract [:keys "Ex" :active t]]
+     ["Fold Changeset" ahg-short-log-histedit-fold [:keys "Ef" :active t]]
+     ["Roll Changeset" ahg-short-log-histedit-roll [:keys "Er" :active t]])
     ["--" nil nil]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
@@ -1419,6 +1433,42 @@ a prefix argument, prompts also for EXTRA-FLAGS."
      buffer)))
 
 
+(defun ahg-short-log-histedit-mess ()
+  "Edit the commit message of the given revision."
+  (interactive)
+  (let ((rev (ahg-short-log-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Edit commit message of revision %s? " rev))
+      (ahg-histedit-mess rev))))
+
+(defun ahg-short-log-histedit-drop ()
+  "Drop the given revision from history."
+  (interactive)
+  (let ((rev (ahg-short-log-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Drop revision %s? " rev))
+      (ahg-histedit-drop rev))))
+
+(defun ahg-short-log-histedit-xtract ()
+  "Extract the given revision from history."
+  (interactive)
+  (let ((rev (ahg-short-log-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Extract revision %s? " rev))
+      (ahg-histedit-xtract rev))))
+
+(defun ahg-short-log-histedit-fold ()
+  "Fold the given revision with its parent."
+  (interactive)
+  (let ((rev (ahg-short-log-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Fold revision %s? " rev))
+      (ahg-histedit-fold rev))))
+
+(defun ahg-short-log-histedit-roll ()
+  "Fold the given revision with its parent, using the parent's commit message."
+  (interactive)
+  (let ((rev (ahg-short-log-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Roll revision %s? " rev))
+      (ahg-histedit-roll rev))))
+
+
 (defvar ahg-log-font-lock-keywords
   '(("^hg \\<[a-z]+\\> for" . ahg-header-line-face)
     ("^hg \\<[a-z]+\\> for \\(.*\\)" 1 ahg-header-line-root-face)
@@ -1463,6 +1513,13 @@ Commands:
   (define-key ahg-log-mode-map [?!] 'ahg-do-command)
   (define-key ahg-log-mode-map [?h] 'ahg-command-help)
   (define-key ahg-log-mode-map "\r" 'ahg-log-update-to-rev)
+  (let ((emap (make-sparse-keymap)))
+    (define-key emap "m" 'ahg-log-histedit-mess)
+    (define-key emap "d" 'ahg-log-histedit-drop)
+    (define-key emap "x" 'ahg-log-histedit-xtract)
+    (define-key emap "f" 'ahg-log-histedit-fold)
+    (define-key emap "r" 'ahg-log-histedit-roll)
+    (define-key ahg-log-mode-map "E" emap))
   (set (make-local-variable 'font-lock-defaults)
        (list 'ahg-log-font-lock-keywords t nil nil))
   (easy-menu-add ahg-log-mode-menu ahg-log-mode-map))
@@ -1479,6 +1536,13 @@ Commands:
     ["--" nil nil]
     ["Next Revision" ahg-log-next [:keys "\t" :active t]]
     ["Previous Revision" ahg-log-previous [:keys "p" :active t]]
+    ["--" nil nil]
+    ("History Editing"
+     ["Edit Changeset Message" ahg-log-histedit-mess [:keys "Em" :active t]]
+     ["Drop Changeset" ahg-log-histedit-drop [:keys "Ed" :active t]]
+     ["Extract Changeset" ahg-log-histedit-xtract [:keys "Ex" :active t]]
+     ["Fold Changeset" ahg-log-histedit-fold [:keys "Ef" :active t]]
+     ["Roll Changeset" ahg-log-histedit-roll [:keys "Er" :active t]])
     ["--" nil nil]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
@@ -1750,6 +1814,42 @@ prompts also for extra flags."
         (ahg-update-to-rev-check-bookmarks t))
     (call-interactively 'ahg-update-to-rev)))
 
+
+(defun ahg-log-histedit-mess ()
+  "Edit the commit message of the given revision."
+  (interactive)
+  (let ((rev (ahg-log-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Edit commit message of revision %s? " rev))
+      (ahg-histedit-mess rev))))
+
+(defun ahg-log-histedit-drop ()
+  "Drop the given revision from history."
+  (interactive)
+  (let ((rev (ahg-log-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Drop revision %s? " rev))
+      (ahg-histedit-drop rev))))
+
+(defun ahg-log-histedit-xtract ()
+  "Extract the given revision from history."
+  (interactive)
+  (let ((rev (ahg-log-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Extract revision %s? " rev))
+      (ahg-histedit-xtract rev))))
+
+(defun ahg-log-histedit-fold ()
+  "Fold the given revision with its parent."
+  (interactive)
+  (let ((rev (ahg-log-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Fold revision %s? " rev))
+      (ahg-histedit-fold rev))))
+
+(defun ahg-log-histedit-roll ()
+  "Fold the given revision with its parent, using the parent's commit message."
+  (interactive)
+  (let ((rev (ahg-log-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Roll revision %s? " rev))
+      (ahg-histedit-roll rev))))
+
 ;;-----------------------------------------------------------------------------
 ;; graph log
 ;;-----------------------------------------------------------------------------
@@ -1797,6 +1897,13 @@ Commands:
   (define-key ahg-glog-mode-map [?h] 'ahg-command-help)
   (define-key ahg-glog-mode-map "\r" 'ahg-glog-update-to-rev)
   (define-key ahg-glog-mode-map [? ] 'ahg-glog-view-details)
+  (let ((emap (make-sparse-keymap)))
+    (define-key emap "m" 'ahg-glog-histedit-mess)
+    (define-key emap "d" 'ahg-glog-histedit-drop)
+    (define-key emap "x" 'ahg-glog-histedit-xtract)
+    (define-key emap "f" 'ahg-glog-histedit-fold)
+    (define-key emap "r" 'ahg-glog-histedit-roll)
+    (define-key ahg-glog-mode-map "E" emap))
   (set (make-local-variable 'font-lock-defaults)
        (list 'ahg-glog-font-lock-keywords t nil nil))
   (set-face-foreground 'ahg-invisible-face (face-background 'default))
@@ -1815,6 +1922,13 @@ Commands:
     ["--" nil nil]
     ["Next Revision" ahg-glog-next [:keys "\t" :active t]]
     ["Previous Revision" ahg-glog-previous [:keys "p" :active t]]
+    ["--" nil nil]
+    ("History Editing"
+     ["Edit Changeset Message" ahg-glog-histedit-mess [:keys "Em" :active t]]
+     ["Drop Changeset" ahg-glog-histedit-drop [:keys "Ed" :active t]]
+     ["Extract Changeset" ahg-glog-histedit-xtract [:keys "Ex" :active t]]
+     ["Fold Changeset" ahg-glog-histedit-fold [:keys "Ef" :active t]]
+     ["Roll Changeset" ahg-glog-histedit-roll [:keys "Er" :active t]])
     ["--" nil nil]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
@@ -1935,6 +2049,42 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                      (replace-match "@")))
                 (funcall refresh root)))
         (call-interactively 'ahg-update-to-rev)))))
+
+
+(defun ahg-glog-histedit-mess ()
+  "Edit the commit message of the given revision."
+  (interactive)
+  (let ((rev (ahg-glog-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Edit commit message of revision %s? " rev))
+      (ahg-histedit-mess rev))))
+
+(defun ahg-glog-histedit-drop ()
+  "Drop the given revision from history."
+  (interactive)
+  (let ((rev (ahg-glog-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Drop revision %s? " rev))
+      (ahg-histedit-drop rev))))
+
+(defun ahg-glog-histedit-xtract ()
+  "Extract the given revision from history."
+  (interactive)
+  (let ((rev (ahg-glog-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Extract revision %s? " rev))
+      (ahg-histedit-xtract rev))))
+
+(defun ahg-glog-histedit-fold ()
+  "Fold the given revision with its parent."
+  (interactive)
+  (let ((rev (ahg-glog-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Fold revision %s? " rev))
+      (ahg-histedit-fold rev))))
+
+(defun ahg-glog-histedit-roll ()
+  "Fold the given revision with its parent, using the parent's commit message."
+  (interactive)
+  (let ((rev (ahg-glog-revision-at-point)))
+    (when (ahg-y-or-n-p (format "Roll revision %s? " rev))
+      (ahg-histedit-roll rev))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg diff
@@ -3642,11 +3792,11 @@ patch editing functionalities provided by Emacs."
 ;; History editing
 ;;-----------------------------------------------------------------------------
 
-(defun ahg-histedit-check-ok (root rev include-parent)
+(defun ahg-histedit-check-ok (root rev)
   (with-temp-buffer
     (let ((global-opts (list "-R" root))
           (args (list "--template" "{node|short}\\n"
-                      "-r" (format "descendants(%s) & (branchpoint() + merge() + public())" (if include-parent (concat "parents(" rev ")") rev)))))
+                      "-r" (format "descendants(%s) & (branchpoint() + merge() + public())" rev))))
       (if (= (ahg-call-process "log" args global-opts) 0)
           (= (point-min) (point-max))
         nil))))
@@ -3664,11 +3814,11 @@ patch editing functionalities provided by Emacs."
         backupname))))
 
 
-(defun ahg-histedit-setup (root op rev include-parent)
+(defun ahg-histedit-setup (root op rev)
   ;; check that there are no uncommitted changes
   (cond ((ahg-uncommitted-changes-p root)
          (error "the working directory contains uncommited changes, aborting"))
-        ((not (ahg-histedit-check-ok root rev include-parent))
+        ((not (ahg-histedit-check-ok root rev))
          (error "unsupported history layout (non-linear and/or public changesets detected), aborting"))
         (t
          (let ((backupname (ahg-histedit-backup root op rev)))
@@ -3722,7 +3872,7 @@ patch editing functionalities provided by Emacs."
       (let* ((root (ahg-root))
              (rev (ahg-histedit-rev-id rev))
              (op (if keep "xtract" "drop"))
-             (backupfile (ahg-histedit-setup root op rev nil))
+             (backupfile (ahg-histedit-setup root op rev))
              (head (ahg-histedit-is-head rev))
              (doit (lexical-let ((root root)
                                  (backupfile backupfile)
@@ -3867,7 +4017,7 @@ patch editing functionalities provided by Emacs."
 (defun ahg-histedit-mess-callback (root rev)
   (condition-case err
       (let ((msg (ahg-parse-commit-message))
-            (backupfile (ahg-histedit-setup root "mess" rev nil))
+            (backupfile (ahg-histedit-setup root "mess" rev))
             (ahg-restore-window-configuration-on-quit t)
             (head (ahg-histedit-is-head rev)))
         (ahg-pop-window-configuration)
@@ -3984,7 +4134,7 @@ patch editing functionalities provided by Emacs."
 (defun ahg-histedit-fold-callback (root rev)
   (condition-case err
       (let ((msg (ahg-parse-commit-message))
-            (backupfile (ahg-histedit-setup root "fold" rev nil))
+            (backupfile (ahg-histedit-setup root "fold" rev))
             (ahg-restore-window-configuration-on-quit t))
         (ahg-pop-window-configuration)
         (kill-buffer (current-buffer))
@@ -4029,7 +4179,7 @@ patch editing functionalities provided by Emacs."
   (condition-case err
       (let* ((root (ahg-root))
              (rev (ahg-histedit-rev-id rev))
-             (backupfile (ahg-histedit-setup root "roll" rev nil))
+             (backupfile (ahg-histedit-setup root "roll" rev))
              (msg (ahg-histedit-get-message (format "p1(%s)" rev))))
         (ahg-histedit-do-fold "roll" msg backupfile root rev))
     (error (let ((buf (generate-new-buffer "*aHg-histedit*")))
