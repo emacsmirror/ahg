@@ -3688,7 +3688,9 @@ patch editing functionalities provided by Emacs."
       (error "error retrieving node for rev %s" rev))))
 
 
-(defun ahg-histedit-rollback (op root rev backupfile)
+(defun ahg-histedit-rollback (op root rev backupfile &optional process)
+  (when process
+    (ahg-show-error process))
   (message "ahg histedit %s on rev %s failed, rolling back" op rev)
   (ahg-generic-command
    "strip" (list "--no-backup" "-r" rev)
@@ -3720,46 +3722,56 @@ patch editing functionalities provided by Emacs."
       (let* ((root (ahg-root))
              (rev (ahg-histedit-rev-id rev))
              (op (if keep "xtract" "drop"))
-             (backupfile (ahg-histedit-setup root op rev nil)))
-        ;; to drop a changeset, we simply graft the descendants onto the parent
-        (ahg-histedit-goto rev t)
-        (ahg-generic-command
-         "graft"
-         (list "-r" (format "descendants(%s) & not %s" rev rev))
-         (lexical-let ((root root)
-                       (backupfile backupfile)
-                       (rev rev)
-                       (keep keep))
-           (lambda (process status)
-             (if (string= status "finished\n")
-                 (progn
-                   (kill-buffer (process-buffer process))
-                   ;; strip the dropped changeset and descendants
-                   (ahg-generic-command
-                    "strip" (list "--no-backup" "-r"
-                                  (if keep (format "children(%s)" rev) rev))
-                    (lexical-let ((root root)
-                                  (backupfile backupfile)
-                                  (rev rev)
-                                  (keep keep))
-                      (lambda (process status)
-                        (let ((op (if keep "xtract" "drop")))
-                          (if (string= status "finished\n")
-                              (progn
-                                (kill-buffer (process-buffer process))
-                                (if keep
-                                    (with-temp-buffer
-                                      (if (= (ahg-call-process
+             (backupfile (ahg-histedit-setup root op rev nil))
+             (head (ahg-histedit-is-head rev))
+             (doit (lexical-let ((root root)
+                                 (backupfile backupfile)
+                                 (rev rev)
+                                 (keep keep))
+                     (lambda (process status)
+                       (let ((op (if keep "xtract" "drop")))
+                         (if (string= status "finished\n")
+                             (progn
+                               (kill-buffer (process-buffer process))
+                               (if keep
+                                   (with-temp-buffer
+                                     (if (= (ahg-call-process
                                               "update"
                                               (list "-r" rev)) 0)
-                                          (message "extracted changeset %s" rev)
-                                        (ahg-histedit-rollback op root rev
-                                                               backupfile)))
-                                  (message "dropped changeset %s" rev)))
-                            (ahg-histedit-rollback op root rev
-                                                   backupfile)))))))
-               (ahg-histedit-rollback (if keep "xtract" "drop")
-                                      root rev backupfile))))))
+                                         (message "extracted changeset %s" rev)
+                                       (ahg-histedit-rollback op root rev
+                                                              backupfile)))
+                                 (message "dropped changeset %s" rev)))
+                           (ahg-histedit-rollback op root rev
+                                                  backupfile process)))))))
+        ;; to drop a changeset, we simply graft the descendants onto the parent
+        (if head
+            (if keep
+                (message "nothing to do")
+              (ahg-generic-command
+               "strip" (list "--no-backup" "-r" rev)
+               doit))
+          (ahg-histedit-goto rev t)
+          (ahg-generic-command
+           "rebase"
+           (list "-r" (format "descendants(%s) & not %s" rev rev) "-d" ".")
+           (if keep
+               doit
+             (lexical-let ((root root)
+                           (backupfile backupfile)
+                           (rev rev)
+                           (keep keep)
+                           (doit doit))
+               (lambda (process status)
+                 (if (string= status "finished\n")
+                     (progn
+                       (kill-buffer (process-buffer process))
+                       ;; strip the dropped changeset and descendants
+                       (ahg-generic-command
+                        "strip" (list "--no-backup" "-r" rev)
+                        doit))
+                   (ahg-histedit-rollback (if keep "xtract" "drop")
+                                          root rev backupfile process))))))))
     (error (let ((buf (generate-new-buffer "*aHg-histedit*")))
              (ahg-show-error-msg (format "aHg histedit error: %s"
                                          (error-message-string err)) buf)))))
@@ -3775,97 +3787,146 @@ patch editing functionalities provided by Emacs."
   (ahg-histedit-do-drop rev t))
 
 
+(defun ahg-histedit-edit-phase2-helper (op msg root rev backupfile
+                                           head strip-parent)
+  (lexical-let ((op op)
+                (msg msg)
+                (root root)
+                (rev rev)
+                (backupfile backupfile)
+                (head head)
+                (strip-parent strip-parent))
+    (lambda (process status)
+      (cd root)
+      (if head
+          (if (or (not strip-parent)
+                  (= (ahg-call-process
+                      "strip" (list "--no-backup" "-r"
+                                    (format "p1(%s)" rev))) 0))
+              (message "%s changeset %s (now become %s)" msg rev
+                       (ahg-histedit-rev-id "."))
+            (ahg-histedit-rollback op root rev backupfile))
+        (if (string= status "finished\n")
+            ;; restore the bundle and rebase it
+            (progn
+              (kill-buffer (process-buffer process))
+              (ahg-generic-command
+               "pull" (list backupfile)
+               (lexical-let ((op op)
+                             (msg msg)
+                             (root root)
+                             (rev rev)
+                             (backupfile backupfile)
+                             (strip-parent strip-parent))
+                 (lambda (process status)
+                   (cd root)
+                   (if (string= status "finished\n")
+                       (progn
+                         (kill-buffer (process-buffer process))
+                         (ahg-generic-command
+                          "rebase" (list "-d" "." "-r"
+                                         (format "descendants(%s) & not %s"
+                                                 rev rev))
+                          (lexical-let ((op op)
+                                        (msg msg)
+                                        (root root)
+                                        (rev rev)
+                                        (backupfile backupfile)
+                                        (strip-parent strip-parent))
+                            (lambda (process status)
+                              (cd root)
+                              (if (string= status "finished\n")
+                                  ;; strip the old changeset
+                                  (with-temp-buffer
+                                    (kill-buffer (process-buffer process))
+                                    (if (= (ahg-call-process
+                                            "strip"
+                                            (list "--no-backup" "-r"
+                                                  (if strip-parent
+                                                      (format "p1(%s)" rev)
+                                                    rev))) 0)
+                                        (message "%s changeset %s (now become %s)"
+                                                 msg rev
+                                                 (ahg-histedit-rev-id "."))
+                                      (ahg-histedit-rollback
+                                       op root rev backupfile)))
+                                (ahg-histedit-rollback op root rev backupfile
+                                                       process))))))
+                     (ahg-histedit-rollback op root rev backupfile process))))))
+          (ahg-histedit-rollback op root rev backupfile process))))))
+
+
+(defun ahg-histedit-is-head (rev)
+  (with-temp-buffer
+    (if (= (ahg-call-process "log" (list "-r" (concat rev " & head()")
+                                         "--template" "{node|short}")) 0)
+        (> (point-max) (point-min))
+      (error "error checking if %s is a head" rev) nil)))
+
+
 (defun ahg-histedit-mess-callback (root rev)
   (condition-case err
       (let ((msg (ahg-parse-commit-message))
-            (backupfile (ahg-histedit-setup root "mess" rev nil)))
+            (backupfile (ahg-histedit-setup root "mess" rev nil))
+            (ahg-restore-window-configuration-on-quit t)
+            (head (ahg-histedit-is-head rev)))
+        (ahg-pop-window-configuration)
         (kill-buffer (current-buffer))
         (cd root)
         (ahg-histedit-goto rev nil)
-        (ahg-generic-command
-         "strip" (list "--no-backup" "-r" (format "children(%s)" rev))
-         (lexical-let ((root root)
-                       (rev rev)
-                       (backupfile backupfile)
-                       (msg msg))
-           (lambda (process status)
-             (cd root)
-             (if (string= status "finished\n")
-                 (ahg-generic-command
-                  "commit" (list "--amend" "-m" msg)
-                  (lexical-let ((root root)
-                                (rev rev)
-                                (backupfile backupfile))
-                    (lambda (process status)
-                      (cd root)
-                      (message "after amend")
-                      (if (string= status "finished\n")
-                          ;; restore the bundle and rebase it
-                          (ahg-generic-command
-                           "pull" (list backupfile)
-                           (lexical-let ((root root)
-                                         (rev rev)
-                                         (backupfile backupfile))
-                             (lambda (process status)
-                               (cd root)
-                               (message "after pull")
-                               (if (string= status "finished\n")
-                                   (ahg-generic-command
-                                    "rebase"
-                                    (list "-d" "." "-r"
-                                          (format "descendants(%s) & not %s"
-                                                  rev rev))
-                                    (lexical-let ((root root)
-                                                  (rev rev)
-                                                  (backupfile backupfile))
-                                      (message "after rebase")
-                                      (lambda (process status)
-                                        (cd root)
-                                        (if (string= status "finished\n")
-                                            ;; strip the old changeset
-                                            (with-temp-buffer
-                                              (message "before calling strip")
-                                              (if (=
-                                                   (ahg-call-process
-                                                    "strip"
-                                                    (list "--no-backup"
-                                                          "-r" rev)) 0)
-                                                  (message "edited commit message of changeset %s (now become %s)" rev (ahg-histedit-rev-id "."))
-                                                (ahg-histedit-rollback
-                                                 "mess" root rev
-                                                 backupfile)))
-                                          (ahg-histedit-rollback
-                                           "mess" root rev backupfile)))))
-                                 (ahg-histedit-rollback "mess"
-                                                        root rev backupfile)))))
-                        (ahg-histedit-rollback "mess" root rev backupfile)))))
-               (ahg-histedit-rollback "mess" root rev backupfile))))))
+        (if head
+            (ahg-generic-command
+             "commit" (list "--amend" "-m" msg)
+             (ahg-histedit-edit-phase2-helper
+              "mess" "edited commit message of" root rev backupfile head nil))
+          (ahg-generic-command
+           "strip" (list "--no-backup" "-r" (format "children(%s)" rev))
+           (lexical-let ((root root)
+                         (rev rev)
+                         (backupfile backupfile)
+                         (msg msg)
+                         (head head))
+             (lambda (process status)
+               (cd root)
+               (if (string= status "finished\n")
+                   (progn
+                     (kill-buffer (process-buffer process))
+                     (ahg-generic-command
+                      "commit" (list "--amend" "-m" msg)
+                      (ahg-histedit-edit-phase2-helper
+                       "mess" "edited commit message of" root rev backupfile
+                       head nil)))
+                 (ahg-histedit-rollback "mess" root rev backupfile
+                                        process)))))))
     (error (let ((buf (generate-new-buffer "*aHg-histedit*")))
              (ahg-show-error-msg (format "aHg histedit error: %s"
                                          (error-message-string err)) buf)))))
 
+
+(defun ahg-histedit-get-message (rev)
+  (with-temp-buffer
+    (if (= (ahg-call-process "log" (list "-r" rev "--template" "{desc}")) 0)
+        (buffer-string)
+      (error "error retrieving commit message of %s" rev) "")))
+  
+
 (defun ahg-histedit-mess (rev)
   (interactive "sEnter revision of message to edit: ")
-  (let (buf root msg args content noedit)
+  (let (buf root msg content noedit)
     (condition-case err
         (progn
-          (message "here" root rev)
           (setq buf (generate-new-buffer "*aHg-log*"))
           (setq root (ahg-root))
           (setq rev (ahg-histedit-rev-id rev))
           (setq msg (concat "Editing commit message of revision " rev))
-          (setq args (list "-r" rev "--template" "{desc}"))
-          (setq content
-                (with-temp-buffer
-                  (if (= (ahg-call-process "log" args) 0)
-                      (buffer-string)
-                    (error "error retrieving commit message of %s" rev) ""))))
+          (setq content (ahg-histedit-get-message rev)))
       (error (let ((buf (generate-new-buffer "*aHg-histedit*")))
                (setq noedit t)
                (ahg-show-error-msg (format "aHg histedit error: %s"
                                            (error-message-string err)) buf))))
-
     (unless noedit
+      (with-current-buffer buf
+        (ahg-push-window-configuration))
       (ahg-log-edit
        (lexical-let ((root root)
                      (rev rev))
@@ -3873,6 +3934,107 @@ patch editing functionalities provided by Emacs."
        (lambda () nil)
        buf
        msg content))))
+
+
+(defun ahg-histedit-do-fold (op msg backupfile root rev)
+  (ahg-histedit-goto (format "p1(p1(%s))" rev) nil)
+  (let* ((head (ahg-histedit-is-head rev))
+         (doit (lexical-let ((op op)
+                             (root root)
+                             (rev rev)
+                             (backupfile backupfile)
+                             (head head))
+                 (lambda (process status)
+                   (cd root)
+                   (if (string= status "finished\n")
+                       ;; update to the new tip
+                       (progn
+                         (kill-buffer (process-buffer process))
+                         (ahg-generic-command
+                          "update" (list "-r" "tip")
+                          (ahg-histedit-edit-phase2-helper
+                           op "folded" root rev backupfile head t)))
+                     (ahg-histedit-rollback
+                      op root rev backupfile process))))))
+    (if head
+        (ahg-generic-command
+         "rebase" (list "-r" rev "-r" (format "p1(%s)" rev) "-d" "."
+                        "--collapse" "-m" msg)
+         doit)
+      (ahg-generic-command
+       "strip" (list "--no-backup" "-r" (format "children(%s)" rev))
+       (lexical-let ((op op)
+                     (root root)
+                     (rev rev)
+                     (backupfile backupfile)
+                     (msg msg)
+                     (doit doit))
+         (lambda (process status)
+           (cd root)
+           (if (string= status "finished\n")
+               (progn
+                 (kill-buffer (process-buffer process))
+                 (ahg-generic-command
+                  "rebase" (list "-r" rev "-r" (format "p1(%s)" rev) "-d" "."
+                                 "--collapse" "-m" msg)
+                  doit))
+             (ahg-histedit-rollback op root rev backupfile process))))))))
+
+
+(defun ahg-histedit-fold-callback (root rev)
+  (condition-case err
+      (let ((msg (ahg-parse-commit-message))
+            (backupfile (ahg-histedit-setup root "fold" rev nil))
+            (ahg-restore-window-configuration-on-quit t))
+        (ahg-pop-window-configuration)
+        (kill-buffer (current-buffer))
+        (ahg-histedit-do-fold "fold" msg backupfile root rev))
+    (error (let ((buf (generate-new-buffer "*aHg-histedit*")))
+             (ahg-show-error-msg (format "aHg histedit error: %s"
+                                         (error-message-string err)) buf)))))
+
+
+(defun ahg-histedit-fold (rev)
+  (interactive "sEnter revision to fold: ")
+  (let (buf root msg args content noedit)
+    (condition-case err
+        (progn
+          (setq buf (generate-new-buffer "*aHg-log*"))
+          (setq root (ahg-root))
+          (setq rev (ahg-histedit-rev-id rev))
+          (setq msg (concat "Folding revision " rev " into parent"))
+          (setq args (list "-r" rev "--template" "{desc}"))
+          (setq content
+                (concat (ahg-histedit-get-message (format "p1(%s)" rev))
+                        "\n\n***\n\n"
+                        (ahg-histedit-get-message rev))))
+      (error (let ((buf (generate-new-buffer "*aHg-histedit*")))
+               (setq noedit t)
+               (ahg-show-error-msg (format "aHg histedit error: %s"
+                                           (error-message-string err)) buf))))
+    (unless noedit
+      (with-current-buffer buf
+        (ahg-push-window-configuration))
+      (ahg-log-edit
+       (lexical-let ((root root)
+                     (rev rev))
+         (lambda () (interactive) (ahg-histedit-fold-callback root rev)))
+       (lambda () nil)
+       buf
+       msg content))))
+
+
+(defun ahg-histedit-roll (rev)
+  (interactive (list (read-string "Enter revision to roll: " ".")))
+  (condition-case err
+      (let* ((root (ahg-root))
+             (rev (ahg-histedit-rev-id rev))
+             (backupfile (ahg-histedit-setup root "roll" rev nil))
+             (msg (ahg-histedit-get-message (format "p1(%s)" rev))))
+        (ahg-histedit-do-fold "roll" msg backupfile root rev))
+    (error (let ((buf (generate-new-buffer "*aHg-histedit*")))
+             (ahg-show-error-msg (format "aHg histedit error: %s"
+                                         (error-message-string err)) buf)))))
 
 ;;-----------------------------------------------------------------------------
 ;; Various helper functions
