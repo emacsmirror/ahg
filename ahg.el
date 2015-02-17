@@ -3856,7 +3856,16 @@ patch editing functionalities provided by Emacs."
                 (if (string= status "finished\n")
                     (message "ahg histedit rollback completed"))
                 (ahg-show-error process))))
-         (ahg-show-error process))))))
+         (ahg-show-error process))))
+   nil
+   nil
+   nil
+   nil
+   nil
+   nil
+   nil
+   (list "--config" "extension.hgext.strip=") ;; global-opts
+   ))
                                  
 
 (defun ahg-histedit-goto (rev parent)
@@ -3900,7 +3909,16 @@ patch editing functionalities provided by Emacs."
                 (message "nothing to do")
               (ahg-generic-command
                "strip" (list "--no-backup" "-r" rev)
-               doit))
+               doit
+               nil
+               nil
+               nil
+               nil
+               nil
+               nil
+               nil
+               (list "--config" "extension.hgext.strip=") ;; global-opts
+               ))
           (ahg-histedit-goto rev t)
           (ahg-generic-command
            "rebase"
@@ -3921,7 +3939,16 @@ patch editing functionalities provided by Emacs."
                         "strip" (list "--no-backup" "-r" rev)
                         doit))
                    (ahg-histedit-rollback (if keep "xtract" "drop")
-                                          root rev backupfile process))))))))
+                                          root rev backupfile process)))))
+           nil
+           nil
+           nil
+           nil
+           nil
+           nil
+           nil
+           (list "--config" "extension.hgext.rebase=") ;; global-opts
+           )))
     (error (let ((buf (generate-new-buffer "*aHg-histedit*")))
              (ahg-show-error-msg (format "aHg histedit error: %s"
                                          (error-message-string err)) buf)))))
@@ -3952,7 +3979,8 @@ patch editing functionalities provided by Emacs."
           (if (or (not strip-parent)
                   (= (ahg-call-process
                       "strip" (list "--no-backup" "-r"
-                                    (format "p1(%s)" rev))) 0))
+                                    (format "p1(%s)" rev))
+                      (list "--config" "extension.hgext.strip=")) 0))
               (message "%s changeset %s (now become %s)" msg rev
                        (ahg-histedit-rev-id "."))
             (ahg-histedit-rollback op root rev backupfile))
@@ -3994,14 +4022,25 @@ patch editing functionalities provided by Emacs."
                                             (list "--no-backup" "-r"
                                                   (if strip-parent
                                                       (format "p1(%s)" rev)
-                                                    rev))) 0)
+                                                    rev))
+                                            (list "--config"
+                                                  "extension.hgext.strip=")) 0)
                                         (message "%s changeset %s (now become %s)"
                                                  msg rev
                                                  (ahg-histedit-rev-id "."))
                                       (ahg-histedit-rollback
                                        op root rev backupfile)))
                                 (ahg-histedit-rollback op root rev backupfile
-                                                       process))))))
+                                                       process))))
+                          nil
+                          nil
+                          nil
+                          nil
+                          nil
+                          nil
+                          nil
+                          (list "--config" "extension.hgext.rebase=") ;; global-opts
+                          ))
                      (ahg-histedit-rollback op root rev backupfile process))))))
           (ahg-histedit-rollback op root rev backupfile process))))))
 
@@ -4047,7 +4086,16 @@ patch editing functionalities provided by Emacs."
                        "mess" "edited commit message of" root rev backupfile
                        head nil)))
                  (ahg-histedit-rollback "mess" root rev backupfile
-                                        process)))))))
+                                        process))))
+           nil
+           nil
+           nil
+           nil
+           nil
+           nil
+           nil
+           (list "--config" "extension.hgext.strip=") ;; global-opts
+           )))
     (error (let ((buf (generate-new-buffer "*aHg-histedit*")))
              (ahg-show-error-msg (format "aHg histedit error: %s"
                                          (error-message-string err)) buf)))))
@@ -4110,7 +4158,16 @@ patch editing functionalities provided by Emacs."
         (ahg-generic-command
          "rebase" (list "-r" rev "-r" (format "p1(%s)" rev) "-d" "."
                         "--collapse" "-m" msg)
-         doit)
+         doit
+         nil
+         nil
+         nil
+         nil
+         nil
+         nil
+         nil
+         (list "--config" "extension.hgext.rebase=") ;; global-opts
+         )
       (ahg-generic-command
        "strip" (list "--no-backup" "-r" (format "children(%s)" rev))
        (lexical-let ((op op)
@@ -4128,7 +4185,16 @@ patch editing functionalities provided by Emacs."
                   "rebase" (list "-r" rev "-r" (format "p1(%s)" rev) "-d" "."
                                  "--collapse" "-m" msg)
                   doit))
-             (ahg-histedit-rollback op root rev backupfile process))))))))
+             (ahg-histedit-rollback op root rev backupfile process))))
+       nil
+       nil
+       nil
+       nil
+       nil
+       nil
+       nil
+       (list "--config" "extension.hgext.strip=") ;; global-opts       
+       ))))
 
 
 (defun ahg-histedit-fold-callback (root rev)
