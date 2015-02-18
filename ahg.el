@@ -1339,6 +1339,7 @@ do nothing."
 ;; helper function used by ahg-short-log, ahg-log and ahg-log-cur-file to
 ;; get arguments from the user
 (defvar ahg-log-default-revisions '("tip" . "0"))
+(defvar ahg-log-default-extra-flags "")
 (defun ahg-log-read-args (is-on-selected-files read-extra-flags)
   (let* ((firstrev
           (read-string
@@ -1358,9 +1359,12 @@ do nothing."
              (list (read-string
                     (concat "hg log"
                             (if is-on-selected-files " (on selected files)" "")
-                            ", extra switches: ") ""))))))
+                            ", extra switches: ")
+                    ahg-log-default-extra-flags))))))
     ;; remember the values entered for the next call
     (setq ahg-log-default-revisions (cons (car retval) (cadr retval)))
+    (when read-extra-flags
+      (setq ahg-log-default-extra-flags (caddr retval)))
     retval))
 
 (defun ahg-log-revrange-end ()
@@ -2049,7 +2053,6 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                      (replace-match "@")))
                 (funcall refresh root)))
         (call-interactively 'ahg-update-to-rev)))))
-
 
 (defun ahg-glog-histedit-mess ()
   "Edit the commit message of the given revision."
