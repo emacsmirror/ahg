@@ -3975,74 +3975,67 @@ patch editing functionalities provided by Emacs."
                 (strip-parent strip-parent))
     (lambda (process status)
       (cd root)
-      (if head
-          (if (or (not strip-parent)
-                  (= (ahg-call-process
-                      "strip" (list "--no-backup" "-r"
-                                    (format "p1(%s)" rev))
-                      (list "--config" "extension.hgext.strip=")) 0))
+      (if (string= status "finished\n")
+          (if head
               (message "%s changeset %s (now become %s)" msg rev
                        (ahg-histedit-rev-id "."))
-            (ahg-histedit-rollback op root rev backupfile))
-        (if (string= status "finished\n")
             ;; restore the bundle and rebase it
-            (progn
-              (kill-buffer (process-buffer process))
-              (ahg-generic-command
-               "pull" (list backupfile)
-               (lexical-let ((op op)
-                             (msg msg)
-                             (root root)
-                             (rev rev)
-                             (backupfile backupfile)
-                             (strip-parent strip-parent))
-                 (lambda (process status)
-                   (cd root)
-                   (if (string= status "finished\n")
-                       (progn
-                         (kill-buffer (process-buffer process))
-                         (ahg-generic-command
-                          "rebase" (list "-d" "." "-r"
-                                         (format "descendants(%s) & not %s"
-                                                 rev rev))
-                          (lexical-let ((op op)
-                                        (msg msg)
-                                        (root root)
-                                        (rev rev)
-                                        (backupfile backupfile)
-                                        (strip-parent strip-parent))
-                            (lambda (process status)
-                              (cd root)
-                              (if (string= status "finished\n")
-                                  ;; strip the old changeset
-                                  (with-temp-buffer
-                                    (kill-buffer (process-buffer process))
-                                    (if (= (ahg-call-process
-                                            "strip"
-                                            (list "--no-backup" "-r"
-                                                  (if strip-parent
-                                                      (format "p1(%s)" rev)
-                                                    rev))
-                                            (list "--config"
-                                                  "extension.hgext.strip=")) 0)
-                                        (message "%s changeset %s (now become %s)"
-                                                 msg rev
-                                                 (ahg-histedit-rev-id "."))
-                                      (ahg-histedit-rollback
-                                       op root rev backupfile)))
-                                (ahg-histedit-rollback op root rev backupfile
-                                                       process))))
-                          nil
-                          nil
-                          nil
-                          nil
-                          nil
-                          nil
-                          nil
-                          (list "--config" "extension.hgext.rebase=") ;; global-opts
-                          ))
-                     (ahg-histedit-rollback op root rev backupfile process))))))
-          (ahg-histedit-rollback op root rev backupfile process))))))
+            (kill-buffer (process-buffer process))
+            (ahg-generic-command
+             "pull" (list backupfile)
+             (lexical-let ((op op)
+                           (msg msg)
+                           (root root)
+                           (rev rev)
+                           (backupfile backupfile)
+                           (strip-parent strip-parent))
+               (lambda (process status)
+                 (cd root)
+                 (if (string= status "finished\n")
+                     (progn
+                       (kill-buffer (process-buffer process))
+                       (ahg-generic-command
+                        "rebase" (list "-d" "." "-r"
+                                       (format "descendants(%s) & not %s"
+                                               rev rev))
+                        (lexical-let ((op op)
+                                      (msg msg)
+                                      (root root)
+                                      (rev rev)
+                                      (backupfile backupfile)
+                                      (strip-parent strip-parent))
+                          (lambda (process status)
+                            (cd root)
+                            (if (string= status "finished\n")
+                                ;; strip the old changeset
+                                (with-temp-buffer
+                                  (kill-buffer (process-buffer process))
+                                  (if (= (ahg-call-process
+                                          "strip"
+                                          (list "--no-backup" "-r"
+                                                (if strip-parent
+                                                    (format "p1(%s)" rev)
+                                                  rev))
+                                          (list "--config"
+                                                "extension.hgext.strip=")) 0)
+                                      (message "%s changeset %s (now become %s)"
+                                               msg rev
+                                               (ahg-histedit-rev-id "."))
+                                    (ahg-histedit-rollback
+                                     op root rev backupfile)))
+                              (ahg-histedit-rollback op root rev backupfile
+                                                     process))))
+                        nil
+                        nil
+                        nil
+                        nil
+                        nil
+                        nil
+                        nil
+                        (list "--config" "extension.hgext.rebase=") ;; global-opts
+                        ))
+                   (ahg-histedit-rollback op root rev backupfile process))))))
+        (ahg-histedit-rollback op root rev backupfile process)))))
 
 
 (defun ahg-histedit-is-head (rev)
