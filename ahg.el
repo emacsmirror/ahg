@@ -447,6 +447,7 @@ Commands:
     (define-key ahg-status-mode-map "i" imap))
   (let ((amap (make-sparse-keymap)))
     (define-key amap "a" 'ahg-status-commit-amend)
+    (define-key amap "s" 'ahg-status-commit-secret)
     (define-key ahg-status-mode-map "C" amap))
   (easy-menu-add ahg-status-mode-menu ahg-status-mode-map))
 
@@ -458,6 +459,7 @@ Commands:
     ["--" nil nil]
     ["Commit" ahg-status-commit [:keys "c" :active t]]
     ["Interactive Commit (Record)" ahg-record [:keys "ic" :active t]]
+    ["Secret Commit" ahg-status-commit-secret [:keys "Cs" :active t]]
     ["Amend" ahg-status-commit-amend [:keys "Ca" :active t]]
     ["Add" ahg-status-add [:keys "a" :active t]]
     ["Remove" ahg-status-remove [:keys "r" :active t]]
@@ -645,8 +647,15 @@ the singleton list with the node at point."
         (forward-line 1)
         (setq logmsg (buffer-substring-no-properties
                       (point-at-bol) (point-max)))))
-    (ahg-commit (append (list "--amend") (mapcar 'cddr files))
-                msg logmsg)))
+    (ahg-commit (mapcar 'cddr files) msg logmsg (list "--amend"))))
+
+
+(defun ahg-status-commit-secret ()
+  (interactive)
+  (let ((files (ahg-status-get-marked nil)))
+    (ahg-commit (mapcar 'cddr files)
+                "committing with secret phase" nil (list "--secret"))))
+
 
 (defun ahg-status-add ()
   (interactive)
@@ -1037,32 +1046,34 @@ Uses find-dired to get them into nicely."
 ;; hg commit
 ;;-----------------------------------------------------------------------------
 
-(defun ahg-commit-callback ()
-  (interactive)
-  (let ((msg (ahg-parse-commit-message)))
-    (let ((args (append (list "-m" msg)
-                        (log-edit-files))))
-      (ahg-generic-command
-       "commit" args
-       (lexical-let ((aroot (ahg-root))
-                     (n (length (log-edit-files))))
-         (lambda (process status)
-           (if (string= status "finished\n")
-               (progn
-                 (ahg-status-maybe-refresh aroot)
-                 (message "Successfully committed %s."
-                          (if (> n 0)
-                              (format "%d file%s" n (if (> n 1) "s" ""))
-                            "all modified files"))
-                 (kill-buffer (process-buffer process)))
-             (ahg-show-error process)))))))
-  (kill-buffer (current-buffer)))
+(defun ahg-commit-callback (extra-args)
+  (lexical-let ((extra-args extra-args))
+    (lambda ()
+      (interactive)
+      (let ((msg (ahg-parse-commit-message)))
+        (let ((args (append (list "-m" msg) extra-args
+                            (log-edit-files))))
+          (ahg-generic-command
+           "commit" args
+           (lexical-let ((aroot (ahg-root))
+                         (n (length (log-edit-files))))
+             (lambda (process status)
+               (if (string= status "finished\n")
+                   (progn
+                     (ahg-status-maybe-refresh aroot)
+                     (message "Successfully committed %s."
+                              (if (> n 0)
+                                  (format "%d file%s" n (if (> n 1) "s" ""))
+                                "all modified files"))
+                     (kill-buffer (process-buffer process)))
+                 (ahg-show-error process)))))))
+      (kill-buffer (current-buffer)))))
 
-(defun ahg-commit (files &optional msg logmsg)
+(defun ahg-commit (files &optional msg logmsg extra-args)
   "Run hg commit. Pops up a buffer for editing the log file."
   (let ((buf (generate-new-buffer "*aHg-log*")))
     (ahg-log-edit
-     'ahg-commit-callback
+     (ahg-commit-callback extra-args)
      (lexical-let ((flist files)) (lambda () flist))
      buf
      msg
