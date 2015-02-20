@@ -2694,6 +2694,29 @@ that buffer is refreshed instead.)"
   (replace-regexp-in-string "[()]" (lambda (m) (concat "\\\\" m))
                             (regexp-quote s)))
 
+
+(defun ahg-grep-filename (filename regexp)
+  (let ((buf (current-buffer)))
+    (with-temp-buffer
+      (insert-file-contents filename nil nil nil t)
+      (goto-char (point-min))
+      (while (not (eobp))
+        (let (found)
+          (while (search-forward-regexp regexp (point-at-eol) t)
+            (setq found t)
+            (replace-match "\033[01;31m\\&\033[0m"))
+          (when found
+            (let ((line (buffer-substring-no-properties (point-at-bol)
+                                                        (point-at-eol)))
+                  (pos (line-number-at-pos)))
+              (with-current-buffer buf
+                (save-excursion
+                  (goto-char (point-max))
+                  (insert filename (format ":%d:" pos) line "\n")))))
+          (goto-char (point-at-eol))
+          (forward-char 1))))))
+    
+
 (defun ahg-manifest-grep (pattern glob)
   "Search for grep-like pattern in the working directory, considering only
 the files under version control."
@@ -2712,11 +2735,59 @@ the files under version control."
                                (query-replace-descr default))
                      "Search for pattern: "))))
       (if (and input (> (length input) 0)) input default))
-    (if current-prefix-arg (read-string "Files to search: ") "")))
-  (grep (format "cd %s && %s locate -0 %s | xargs -0 grep -nHE -e %s"
-                (ahg-root) ahg-hg-command
-                (shell-quote-argument glob)
-                (shell-quote-argument pattern))))
+    (if current-prefix-arg (read-string "Files to search: ") nil)))
+  (let ((root (ahg-root))
+        (buf (get-buffer-create "*ahg-grep*")))
+    (with-current-buffer buf
+      (cd root)
+      (ahg-generic-command
+       "files" (when glob (list glob))
+       (lexical-let ((buf buf)
+                     (root root)
+                     (glob glob)
+                     (pattern pattern))
+         (lambda (process status)
+           (if (string= status "finished\n")
+               (let ((inhibit-read-only t)
+                     files)
+                 (with-current-buffer (process-buffer process)
+                   (goto-char (point-min))
+                   (while (not (eobp))
+                     (add-to-list
+                      'files
+                      (buffer-substring-no-properties (point-at-bol)
+                                                      (point-at-eol)))
+                     (goto-char (1+ (point-at-eol)))))
+                 (kill-buffer (process-buffer process))
+                 (pop-to-buffer buf)
+                 (erase-buffer)
+                 (insert (propertize "searching for pattern "
+                                     'font-lock-face ahg-header-line-face)
+                         (propertize pattern
+                                     'font-lock-face font-lock-string-face)
+                         (propertize " in "
+                                     'font-lock-face ahg-header-line-face)
+                         (propertize root
+                                     'font-lock-face ahg-header-line-root-face)
+                         (propertize
+                          (if glob (format " (on `%s' files)" glob) "")
+                          'font-lock-face ahg-header-line-face)
+                         "\n\n")
+                 (grep-mode)
+                 (local-set-key
+                  "g"
+                  (lexical-let ((glob glob)
+                                (root root)
+                                (pattern pattern))
+                    (lambda ()
+                      (interactive)
+                      (ahg-manifest-grep pattern glob))))
+                 (redisplay)
+                 (mapcar (lambda (f) (ahg-grep-filename f pattern) (redisplay))
+                         (nreverse files))
+                 (message "aHg grep finished"))
+             (ahg-show-error process))))
+       nil nil t))))
 
 ;;-----------------------------------------------------------------------------
 ;; MQ support
