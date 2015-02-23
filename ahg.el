@@ -748,8 +748,7 @@ the file on the current line."
   (let ((files
          (if all (ahg-status-get-marked 'all)
            (let ((n (ewoc-locate ewoc))) (when n (list (ewoc-data n))))))
-;;         (ahg-status-get-marked (if all 'all 'cur)))
-        (buf (get-buffer-create "*aHg diff*"))
+        (buf (get-buffer-create "*aHg-diff*"))
         (curdir default-directory)
         (inhibit-read-only t)
         (args (when ahg-diff-use-git-format '("--git"))))
@@ -760,17 +759,19 @@ the file on the current line."
            (with-current-buffer buf
              (erase-buffer)
              (ahg-push-window-configuration))
-           (ahg-generic-command "diff" (append args (mapcar 'cddr files))
-                                (lambda (process status)
-                                  (if (string= status "finished\n")
-                                      (progn
-                                        (pop-to-buffer (process-buffer process))
-                                        (ahg-diff-mode)
-                                        (set-buffer-modified-p nil)
-                                        (goto-char (point-min)))
-                                    (ahg-show-error process)))
-                                buf)))
-     ))
+           (ahg-generic-command
+            "diff" (append args (mapcar 'cddr files))
+            (lambda (process status)
+              (if (string= status "finished\n")
+                  (progn
+                    (pop-to-buffer (process-buffer process))
+                    (ahg-set-diff-mode (cons nil (ahg-rev-id ".")))
+                    (set-buffer-modified-p nil)
+                    (goto-char (point-min)))
+                (ahg-show-error process)))
+            buf)))
+    ))
+
 
 (defun ahg-status-diff-all ()
   (interactive)
@@ -2136,12 +2137,22 @@ Commands:
             (set (make-local-variable 'diff-remembered-defdir)
                  default-directory)
             (diff-tell-file-name nil hint)))
-        )))
-  (define-key ahg-diff-mode-map "q" 'ahg-buffer-quit)
-  (easy-menu-add-item nil '("Diff") '["--" nil nil])
-  (easy-menu-add-item nil '("Diff") '["Quit" ahg-buffer-quit
-                                      [:keys "q" :active t]]))
+        ))))
 
+
+(defun ahg-set-diff-mode (&optional revs)
+  (let ((inhibit-read-only t))
+    (ahg-diff-mode)
+    (easy-menu-add-item nil '("Diff") '["--" nil nil])
+    (when revs
+      (set (make-local-variable 'ahg-diff-revs) revs)
+      (define-key ahg-diff-mode-map "e" 'ahg-diff-ediff)
+      (easy-menu-add-item nil '("Diff") '["View with Ediff" ahg-diff-ediff
+                                          [:keys "e" :active t]]))
+    (define-key ahg-diff-mode-map "q" 'ahg-buffer-quit)
+    (easy-menu-add-item nil '("Diff") '["Quit" ahg-buffer-quit
+                                        [:keys "q" :active t]])))
+    
 
 (defun ahg-diff (&optional r1 r2 files)
   (interactive "P")
@@ -2149,7 +2160,7 @@ Commands:
     (unless r1
       (setq r1 (read-string "hg diff, R1: " "tip"))
       (setq r2 (read-string "hg diff, R2: " ""))))
-  (let ((buffer (get-buffer-create "*aHg diff*"))
+  (let ((buffer (get-buffer-create "*aHg-diff*"))
         (command-list (ahg-args-add-revs r1 r2 t))
         (curdir default-directory))
     (with-current-buffer buffer
@@ -2162,20 +2173,25 @@ Commands:
       (let ((inhibit-read-only t))
         (erase-buffer)
         (ahg-push-window-configuration)))
-    (ahg-generic-command "diff" command-list
-                         (lambda (process status)
-                           (if (string= status "finished\n")
-                               (progn
-                                 (pop-to-buffer (process-buffer process))
-                                 (ahg-diff-mode)
-                                 (goto-char (point-min)))
-                             (ahg-show-error process)))
-                         buffer)))
+    (ahg-generic-command
+     "diff" command-list
+     (lexical-let ((r1 r1)
+                   (r2 r2))
+       (lambda (process status)
+         (if (string= status "finished\n")
+             (progn
+               (pop-to-buffer (process-buffer process))
+               (ahg-set-diff-mode (cons (when r1 (ahg-rev-id r1))
+                                        (ahg-rev-id (if r2 r2 "."))))
+               (goto-char (point-min)))
+           (ahg-show-error process))))
+     buffer)))
+
 
 (defun ahg-diff-c (r &optional files)
   "runs hg diff -c (show changes in revision)"
   (interactive)
-  (let ((buffer (get-buffer-create "*aHg diff*"))
+  (let ((buffer (get-buffer-create "*aHg-diff*"))
         (command-list (list "-c" r))
         (curdir default-directory))
     (with-current-buffer buffer
@@ -2188,15 +2204,19 @@ Commands:
       (let ((inhibit-read-only t))
         (erase-buffer)
         (ahg-push-window-configuration)))
-    (ahg-generic-command "diff" command-list
-                         (lambda (process status)
-                           (if (string= status "finished\n")
-                               (progn
-                                 (pop-to-buffer (process-buffer process))
-                                 (ahg-diff-mode)
-                                 (goto-char (point-min)))
-                             (ahg-show-error process)))
-                         buffer)))
+    (ahg-generic-command
+     "diff" command-list
+     (lexical-let ((r r))
+       (lambda (process status)
+         (if (string= status "finished\n")
+             (progn
+               (pop-to-buffer (process-buffer process))
+               (ahg-set-diff-mode (cons (ahg-rev-id r)
+                                        (ahg-rev-id (format "p1(%s)" r))))
+               (goto-char (point-min)))
+           (ahg-show-error process))))
+     buffer)))
+
 
 (defun ahg-diff-cur-file (ask-other-rev)
   (interactive "P")
@@ -2209,6 +2229,43 @@ Commands:
                      (read-string "Enter revision to compare against: "))
                    nil (list (buffer-file-name))))
         (t (message "hg diff: no file found, aborting."))))
+
+
+(defun ahg-diff-get-ediff-buffer (root filename rev)
+  (let ((buf (get-buffer-create (format "*aHg-diff-%s-%s" (or rev "")
+                                        filename))))
+    (with-current-buffer buf
+      (cond ((not (ahg-cd root)) (error "can't cd to %s" root))
+            (rev
+             (if (= (ahg-call-process "cat" (list "-r" rev filename)) 0)
+                 buf
+               (error "error retrieving revision %s of %s" rev filename)))
+            (t (insert-file-contents filename nil nil nil t) buf)))))
+
+
+(defun ahg-diff-ediff ()
+  "Examine the current aHg diff in an Ediff session."
+  (interactive)
+  (if (not (boundp 'ahg-diff-revs))
+      (message "error: no revision diff information for current buffer")
+    (condition-case err
+        (let* ((root (ahg-root))
+               (filename (file-relative-name (diff-find-file-name) root))
+               (m (message "found filename %s %s" filename ahg-diff-revs))
+               (buf1 (ahg-diff-get-ediff-buffer root filename
+                                                (car ahg-diff-revs)))
+               (buf2 (ahg-diff-get-ediff-buffer root filename
+                                                (cdr ahg-diff-revs))))
+          (with-current-buffer (ediff-buffers buf1 buf2)
+            ;; kill the temporary buffers at the end of the ediff session
+            (set (make-local-variable 'ediff-quit-hook)
+                 (cons (lexical-let ((buf1 buf1) (buf2 buf2))
+                         (lambda () (kill-buffer buf1) (kill-buffer buf2)))
+                       ediff-quit-hook))))
+    (error
+     (let ((buf (generate-new-buffer "*aHg-ediff*")))
+       (ahg-show-error-msg (format "aHg ediff error: %s"
+                                   (error-message-string err)) buf))))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg annotate
@@ -3179,7 +3236,7 @@ last refresh."
              (progn
                (pop-to-buffer (process-buffer process))
                (setq default-directory aroot)
-               (ahg-diff-mode)
+               (ahg-set-diff-mode)
                (goto-char (point-min)))
            (ahg-show-error process))))
      buf)))
@@ -3472,7 +3529,7 @@ about which are currently applied."
     (when patch
       (find-file-other-window
        (concat (file-name-as-directory root) ".hg/patches/" patch))
-      (ahg-diff-mode))))
+      (ahg-set-diff-mode))))
 
 (defun ahg-mq-patches-patch-at-point ()
   (let ((node (ewoc-locate ewoc)))
@@ -3688,7 +3745,7 @@ so that filename completion works on patch names."
              (parent (caddr data))
              (patchbuf (cadddr data)))
         (switch-to-buffer patchbuf)
-        (ahg-diff-mode)
+        (ahg-set-diff-mode)
         (toggle-read-only nil)
         (local-set-key
          (kbd "C-c C-c")
@@ -3893,16 +3950,10 @@ patch editing functionalities provided by Emacs."
 
 
 (defun ahg-histedit-rev-id (rev)
-  (with-temp-buffer
-    (if (= (ahg-call-process "log"
-                             (list "-r" rev "--template" "{node|short} ")) 0)
-        (let ((node (buffer-substring-no-properties (point-min)
-                                                    (1- (point-max)))))
-          (if (or (string= node "") (string-match "^.* .*$" node))
-              (error "bad revision number %s" rev)
-            node))
-      (error "error retrieving node for rev %s" rev))))
-
+  (let ((r (ahg-rev-id rev)))
+    (if (or (null r) (string= r "") (string-match "^.* .*$" r))
+        (error "bad revision number %s" rev)
+      r)))
 
 (defun ahg-histedit-rollback (op root rev backupfile &optional process)
   (when process
@@ -4309,6 +4360,14 @@ patch editing functionalities provided by Emacs."
 ;;-----------------------------------------------------------------------------
 ;; Various helper functions
 ;;-----------------------------------------------------------------------------
+
+(defun ahg-rev-id (rev)
+  (with-temp-buffer
+    (if (= (ahg-call-process "log"
+                             (list "-r" rev "--template" "{node|short} ")) 0)
+        (let ((node (buffer-substring-no-properties (point-min)
+                                                    (1- (point-max)))))
+          node))))
 
 (defun ahg-first-parent-of-rev (rev)
   (with-temp-buffer
