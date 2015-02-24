@@ -199,6 +199,11 @@ For `nil' the default file is used."
   "If true, pass --remote to summary command used by ahg-status"
   :group 'ahg :type 'boolean)
 
+(defcustom ahg-manifest-grep-use-xargs-grep t
+  "If true, use `xargs' and `grep' commands for implementing `ahg-manifest-grep'
+ (otherwise, an elisp function is used)."
+  :group 'ahg :type 'boolean)
+
 (defface ahg-status-marked-face
   '((default (:inherit font-lock-preprocessor-face)))
   "Face for marked files in aHg status buffers." :group 'ahg)
@@ -2751,27 +2756,61 @@ that buffer is refreshed instead.)"
                             (regexp-quote s)))
 
 
+(defun ahg-grep-filename-setup (filename)
+  (buffer-disable-undo)
+  (let ((b 0)
+        (ok t)
+        r)
+    (while
+        (progn
+          (setq r (insert-file-contents-literally filename nil b (+ b 1048576)))
+          (and ok r (> (cadr r) 0)))
+      (if (save-excursion (goto-char b) (search-forward "\000" nil t))
+          ;; exclude binary files. here, we use the same approach as Mercurial
+          ;; for detecting binaries: we simply check for a 0 byte
+          (setq ok nil)
+        (setq b (+ b (cadr r)))))
+    (goto-char (point-min))
+    ok))
+
 (defun ahg-grep-filename (filename regexp)
-  (let ((buf (current-buffer)))
+  (let ((buf (current-buffer))
+        (nmatches 0))
     (with-temp-buffer
-      (insert-file-contents filename nil nil nil t)
-      (goto-char (point-min))
-      (while (not (eobp))
-        (let (found)
-          (while (search-forward-regexp regexp (point-at-eol) t)
-            (setq found t)
-            (replace-match "\033[01;31m\\&\033[0m"))
-          (when found
-            (let ((line (buffer-substring-no-properties (point-at-bol)
-                                                        (point-at-eol)))
-                  (pos (line-number-at-pos)))
-              (with-current-buffer buf
-                (save-excursion
-                  (goto-char (point-max))
-                  (insert filename (format ":%d:" pos) line "\n")))))
-          (goto-char (point-at-eol))
-          (forward-char 1))))))
-    
+      (when (ahg-grep-filename-setup filename)
+        (while (not (eobp))
+          (let (found)
+            (while (search-forward-regexp regexp (point-at-eol) t)
+              (setq found t)
+              (setq nmatches (1+ nmatches))
+              (replace-match "\033[01;31m\\&\033[0m"))
+            (when found
+              (let ((line (buffer-substring-no-properties (point-at-bol)
+                                                          (point-at-eol)))
+                    (pos (line-number-at-pos)))
+                (with-current-buffer buf
+                  (save-excursion
+                    (goto-char (point-max))
+                    (insert filename (format ":%d:" pos) line "\n")))))
+            (goto-char (1+ (point-at-eol)))))))
+    nmatches))
+
+
+(defun ahg-grep-filename-grep (filename regexp)
+  (let ((buf (current-buffer))
+        (gbuf (get-buffer-create "*ahg-grep*")))
+    (let ((process (start-file-process "*ahg-grep*" gbuf
+                                       "grep" "--color=always" "-I" "-nHE"
+                                       regexp filename)))
+      (set-process-sentinel
+       process
+       (lexical-let ((buf buf))
+         (lambda (process status)
+           (when (string= status "finished\n")
+             (with-current-buffer buf
+               (insert-buffer-substring (process-buffer process)))
+             (kill-buffer (process-buffer process)))))))))
+
 
 (defun ahg-manifest-grep (pattern glob)
   "Search for grep-like pattern in the working directory, considering only
@@ -2792,61 +2831,136 @@ the files under version control."
                      "Search for pattern: "))))
       (if (and input (> (length input) 0)) input default))
     (if current-prefix-arg (read-string "Files to search: ") nil)))
-  (let ((root (ahg-root))
-        (buf (get-buffer-create "*ahg-grep*")))
-    (with-current-buffer buf
-      (if (ahg-cd root)
-          (ahg-generic-command
-           "files" (when glob (list glob))
-           (lexical-let ((buf buf)
-                         (root root)
-                         (glob glob)
-                         (pattern pattern))
-             (lambda (process status)
-               (if (string= status "finished\n")
-                   (let ((inhibit-read-only t)
-                         files)
-                     (with-current-buffer (process-buffer process)
-                       (goto-char (point-min))
-                       (while (not (eobp))
-                         (add-to-list
-                          'files
-                          (buffer-substring-no-properties (point-at-bol)
-                                                          (point-at-eol)))
-                         (goto-char (1+ (point-at-eol)))))
-                     (kill-buffer (process-buffer process))
-                     (pop-to-buffer buf)
-                     (erase-buffer)
-                     (insert (propertize "searching for pattern "
-                                         'font-lock-face ahg-header-line-face)
-                             (propertize pattern
-                                         'font-lock-face font-lock-string-face)
-                             (propertize " in "
-                                         'font-lock-face ahg-header-line-face)
-                             (propertize root
-                                         'font-lock-face
-                                         ahg-header-line-root-face)
-                             (propertize
-                              (if glob (format " (on `%s' files)" glob) "")
+  (let* ((root (ahg-root))
+         (header
+          (concat (propertize "searching for pattern "
                               'font-lock-face ahg-header-line-face)
-                             "\n\n")
-                     (grep-mode)
-                     (local-set-key
-                      "g"
-                      (lexical-let ((glob glob)
-                                    (root root)
-                                    (pattern pattern))
-                        (lambda ()
-                          (interactive)
-                          (ahg-manifest-grep pattern glob))))
-                     (redisplay)
-                     (mapcar
-                      (lambda (f) (ahg-grep-filename f pattern) (redisplay))
-                      (nreverse files))
-                     (message "aHg grep finished"))
-                 (ahg-show-error process))))
-           nil nil t)
-        (ahg-show-error-msg (format "can't cd to %s" root) buf)))))
+                  (propertize pattern
+                              'font-lock-face font-lock-string-face)
+                  (propertize " in "
+                              'font-lock-face ahg-header-line-face)
+                  (propertize root
+                              'font-lock-face
+                              ahg-header-line-root-face)
+                  (propertize
+                   (if glob (format " (on `%s' files)" glob) "")
+                   'font-lock-face ahg-header-line-face)
+                  "\n\n"))
+         (do-refresh
+          (lexical-let ((glob glob)
+                        (pattern pattern))
+            (lambda ()
+              (interactive)
+              (ahg-manifest-grep pattern glob)))))
+    (if ahg-manifest-grep-use-xargs-grep
+        (progn
+          (ahg-cd root)
+          (let* ((grep-setup-hook
+                  (cons
+                   (lexical-let ((header header))
+                     (lambda ()
+                       (let ((inhibit-read-only t))
+                         (erase-buffer)
+                         (insert header)
+                         (goto-char (point-min))
+                         (forward-line 1))
+                       (set (make-local-variable
+                             'compilation-exit-message-function)
+                            (lexical-let ((buf (current-buffer)))
+                              (lambda (status code msg)
+                                (when (eq status 'exit)
+                                  (set (make-local-variable 'ahg-grep-ok)
+                                       (or (zerop code) (= code 123))))
+                                (cons msg code))))
+                       (set (make-local-variable 'compilation-finish-functions)
+                            (cons
+                             (lambda (buf msg)
+                               (with-current-buffer buf
+                                 (when (and (boundp 'ahg-grep-ok)
+                                            ahg-grep-ok)
+                                   (let ((inhibit-read-only t))
+                                     (save-excursion
+                                       (goto-char (point-max))
+                                       (forward-line -1)
+                                       (beginning-of-line)
+                                       (kill-line)
+                                       (insert
+                                        (propertize
+                                         (concat
+                                          (make-string
+                                           (1- (window-width
+                                                (selected-window))) ?-)
+                                          "\naHg grep finished at "
+                                          (substring
+                                           (current-time-string) 0 19)
+                                          "\n") 'font-lock-face 'default))
+                                       (message "aHg grep finished")
+                                       (setq mode-line-process nil)
+                                       (force-mode-line-update))))))
+                             compilation-finish-functions))))
+                   grep-setup-hook))
+                 (buf (grep
+                       (format "%s files -0 %s | xargs -0 grep -I -nHE -e %s"
+                               ahg-hg-command
+                               (shell-quote-argument (or glob ""))
+                               (shell-quote-argument pattern))))
+                 (prevbuf (get-buffer "*ahg-grep*"))
+                 (inhibit-read-only t))
+            (when (and prevbuf (not (eq prevbuf buf))) (kill-buffer prevbuf))
+            (with-current-buffer buf
+              (rename-buffer "*ahg-grep*")
+              (local-set-key "g" do-refresh))))              
+      (let ((buf (get-buffer-create "*ahg-grep*")))
+        (with-current-buffer buf
+          (pop-to-buffer buf)
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (insert header)
+            (grep-mode)
+            (local-set-key "g" do-refresh)
+            (setq mode-line-process
+                  (list (concat ":" (propertize "running" 'face
+                                                '(:foreground "#DD0000"))))))
+          (if (ahg-cd root)
+              (ahg-generic-command
+               "files" (when glob (list glob))
+               (lexical-let ((buf buf)
+                             (root root)
+                             (glob glob)
+                             (pattern pattern))
+                 (lambda (process status)
+                   (if (string= status "finished\n")
+                       (let ((inhibit-read-only t)
+                             files)
+                         (with-current-buffer (process-buffer process)
+                           (goto-char (point-min))
+                           (while (not (eobp))
+                             (add-to-list
+                              'files
+                              (buffer-substring-no-properties (point-at-bol)
+                                                              (point-at-eol)))
+                             (goto-char (1+ (point-at-eol)))))
+                         (pop-to-buffer buf)
+                         (redisplay)
+                         (mapcar
+                          (lambda (f) (ahg-grep-filename f pattern))
+                          (nreverse files))
+                         (save-excursion
+                           (goto-char (point-max))
+                           (insert
+                            (propertize
+                             (concat
+                              (make-string (1- (window-width
+                                                (selected-window))) ?-)
+                              "\naHg grep finished at "
+                              (substring (current-time-string) 0 19)
+                              "\n") 'font-lock-face 'default)))
+                         (message "aHg grep finished")
+                         (setq mode-line-process nil)
+                         (force-mode-line-update))
+                     (ahg-show-error process))))
+               nil nil t)
+            (ahg-show-error-msg (format "can't cd to %s" root) buf)))))))
 
 ;;-----------------------------------------------------------------------------
 ;; MQ support
