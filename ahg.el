@@ -317,9 +317,6 @@ For `nil' the default file is used."
   "Returns the root of the tree handled by Mercurial, or nil if
 the current dir is not under hg."
   (locate-dominating-file default-directory ".hg"))
-  ;; (with-temp-buffer
-  ;;   (when (= (ahg-call-process "root") 0)
-  ;;     (buffer-substring-no-properties (point-min) (1- (point-max))))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg identify
@@ -334,10 +331,11 @@ the current dir is not under hg."
                (let ((default-directory (file-name-as-directory root)))
                  (ahg-call-process "identify" args))
              (ahg-call-process "identify" args))))
-      (when (= status 0)
+      (if (= status 0)
         (concat
          "Id: "
-         (buffer-substring-no-properties (point-min) (1- (point-max))))))))
+         (buffer-substring-no-properties (point-min) (1- (point-max))))
+        (concat "hg identify failed for " root)))))
 
 (defun ahg-summary-info (root)
   (with-temp-buffer
@@ -868,7 +866,8 @@ it or pressing RET on it will initiate a merge."
               'help-echo "Run hg merge"
               'face 'info-xref
               'keymap map))
-     summary)))
+     summary))
+  )
 
 (defun ahg-get-status-ewoc (root)
   "Returns an *hg status* buffer for ROOT. The buffer's major mode is
@@ -880,7 +879,8 @@ ahg-status, and it has an ewoc associated with it."
                  (propertize root 'face ahg-header-line-root-face) "\n"))
         (footer (concat "\n"
                         (make-string (1- (window-width (selected-window))) ?-)
-                        "\n" (propertize-summary-info (ahg-summary-info root)))))
+                        "\n" (propertize-summary-info
+                              (ahg-summary-info root)))))
     (with-current-buffer buf
       (erase-buffer)
       (let ((ew (ewoc-create 'ahg-status-pp
@@ -2187,7 +2187,7 @@ Commands:
              (progn
                (pop-to-buffer (process-buffer process))
                (ahg-set-diff-mode
-                (cond ((and r1 r2) (cons (ahg-rev-id r1) (ahg-rev-id r2)))
+                (cond ((and r1 r2) (cons (ahg-rev-id r2) (ahg-rev-id r1)))
                       (r1 (cons nil (ahg-rev-id r1)))
                       (t (cons nil (ahg-rev-id ".")))))
                (goto-char (point-min)))
@@ -4394,14 +4394,7 @@ patch editing functionalities provided by Emacs."
           node))))
 
 (defun ahg-first-parent-of-rev (rev)
-  (with-temp-buffer
-    (let ((process-environment (cons "LANG=" process-environment)))
-      (if (= (ahg-call-process "parents"
-                               (list "-r" rev "--template" "{rev} ")) 0)
-          (car (split-string (buffer-string)))
-        (if (string-to-number rev)
-            (number-to-string (1- (string-to-number rev)))
-          0)))))
+  (concat "p1(" rev ")"))
 
 (defun ahg-buffer-quit ()
   (interactive)
