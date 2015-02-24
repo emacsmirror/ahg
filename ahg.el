@@ -60,6 +60,7 @@
                       ["Revision DAG" ahg-glog t]
                       ["Commit Current File" ahg-commit-cur-file t]
                       ["View Changes of Current File" ahg-diff-cur-file t]
+                      ["View Ediff of Current File" ahg-diff-ediff-cur-file t]
                       ["View Change Log of Current File" ahg-log-cur-file t]
                       ["Annotate Current File" ahg-annotate-cur-file t]
                       ["Revert Current File" ahg-revert-cur-file t]
@@ -97,6 +98,7 @@
     (define-key map "h" 'ahg-command-help)
     (define-key map "c" 'ahg-commit-cur-file)
     (define-key map "=" 'ahg-diff-cur-file)
+    (define-key map "e" 'ahg-diff-ediff-cur-file)
     (define-key map "a" 'ahg-annotate-cur-file)
     (define-key map "r" 'ahg-revert-cur-file)
     (define-key map "R" 'ahg-rm-cur-file)
@@ -397,6 +399,7 @@ Commands:
   (define-key ahg-status-mode-map "A" 'ahg-status-addremove)
   (define-key ahg-status-mode-map "=" 'ahg-status-diff)
   (define-key ahg-status-mode-map "D" 'ahg-status-diff-all)
+  (define-key ahg-status-mode-map "e" 'ahg-status-diff-ediff)
   (define-key ahg-status-mode-map "r" 'ahg-status-remove)
   (define-key ahg-status-mode-map "g" 'ahg-status-refresh)
   (define-key ahg-status-mode-map "I" 'ahg-status-add-to-hgignore)
@@ -482,6 +485,7 @@ Commands:
     ["Revision DAG" ahg-glog [:keys "G" :active t]]
     ["Diff" ahg-status-diff [:keys "=" :active t]]
     ["Diff Marked" ahg-status-diff-all [:keys "D" :active t]]
+    ["Ediff" ahg-status-diff-ediff [:keys "e" :active t]]
     ["--" nil nil]
     ("Show"
      ["Default" ahg-status-show-default [:keys "ss" :active t]]
@@ -747,30 +751,22 @@ the file on the current line."
   (interactive)
   (let ((files
          (if all (ahg-status-get-marked 'all)
-           (let ((n (ewoc-locate ewoc))) (when n (list (ewoc-data n))))))
-        (buf (get-buffer-create "*aHg-diff*"))
-        (curdir default-directory)
-        (inhibit-read-only t)
-        (args (when ahg-diff-use-git-format '("--git"))))
-    (with-current-buffer buf
-      (setq default-directory (file-name-as-directory curdir)))
-    (cond ((null files) (message "aHg diff: no file selected."))
-          (t      
-           (with-current-buffer buf
-             (erase-buffer)
-             (ahg-push-window-configuration))
-           (ahg-generic-command
-            "diff" (append args (mapcar 'cddr files))
-            (lambda (process status)
-              (if (string= status "finished\n")
-                  (progn
-                    (pop-to-buffer (process-buffer process))
-                    (ahg-set-diff-mode (cons nil (ahg-rev-id ".")))
-                    (set-buffer-modified-p nil)
-                    (goto-char (point-min)))
-                (ahg-show-error process)))
-            buf)))
-    ))
+           (let ((n (ewoc-locate ewoc))) (when n (list (ewoc-data n)))))))
+    (if files
+        (ahg-diff nil nil (mapcar 'cddr files))
+      (message "aHg diff: no file selected."))))
+
+
+(defun ahg-status-diff-ediff ()
+  "Shows diff of the working directory version of the current selected file
+wrt. its parent revision, using Ediff."
+  (interactive)
+  (let* ((n (ewoc-locate ewoc))
+         (filename (when n (cddr (ewoc-data n)))))
+    (if filename
+        (let ((ahg-diff-revs (cons nil (ahg-rev-id "."))))
+          (ahg-diff-ediff filename))
+      (message "aHg diff: no file selected."))))
 
 
 (defun ahg-status-diff-all ()
@@ -1711,6 +1707,15 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                  (r2 (ahg-first-parent-of-rev r1))
                  (fn (ahg-log-filename-at-point (point))))
             (ahg-diff r2 r1 (list fn)))))
+    (define-key map "e"
+      (lambda ()
+        (interactive)
+          (let* ((r1 (ahg-log-revision-at-point t))
+                 (r2 (ahg-first-parent-of-rev r1))
+                 (fn (file-relative-name
+                      (ahg-log-filename-at-point (point)) (ahg-root))))
+            (let ((ahg-diff-revs (cons (ahg-rev-id r1) (ahg-rev-id r2))))
+              (ahg-diff-ediff fn)))))
     map))
 
 (defun ahg-log-filename-at-point (point)
@@ -2181,8 +2186,10 @@ Commands:
          (if (string= status "finished\n")
              (progn
                (pop-to-buffer (process-buffer process))
-               (ahg-set-diff-mode (cons (when r1 (ahg-rev-id r1))
-                                        (ahg-rev-id (if r2 r2 "."))))
+               (ahg-set-diff-mode
+                (cond ((and r1 r2) (cons (ahg-rev-id r1) (ahg-rev-id r2)))
+                      (r1 (cons nil (ahg-rev-id r1)))
+                      (t (cons nil (ahg-rev-id ".")))))
                (goto-char (point-min)))
            (ahg-show-error process))))
      buffer)))
@@ -2231,8 +2238,24 @@ Commands:
         (t (message "hg diff: no file found, aborting."))))
 
 
+(defun ahg-diff-ediff-cur-file (ask-other-rev)
+  (interactive "P")
+  (cond ((eq major-mode 'ahg-status-mode)
+         (call-interactively 'ahg-status-diff-ediff))
+        ((buffer-file-name)
+         (let ((ahg-diff-revs
+                (cons nil
+                      (ahg-rev-id
+                       (if ask-other-rev
+                           (read-string "Enter revision to compare against: ")
+                         ".")))))
+           (ahg-diff-ediff (file-relative-name (buffer-file-name)
+                                               (ahg-root)))))
+        (t (message "hg diff: no file found, aborting."))))
+
+
 (defun ahg-diff-get-ediff-buffer (root filename rev)
-  (let ((buf (get-buffer-create (format "*aHg-diff-%s-%s" (or rev "")
+  (let ((buf (get-buffer-create (format "*aHg-diff-%s-%s" (or rev "*workdir*")
                                         filename))))
     (with-current-buffer buf
       (cond ((not (ahg-cd root)) (error "can't cd to %s" root))
@@ -2243,14 +2266,15 @@ Commands:
             (t (insert-file-contents filename nil nil nil t) buf)))))
 
 
-(defun ahg-diff-ediff ()
+(defun ahg-diff-ediff (&optional filename)
   "Examine the current aHg diff in an Ediff session."
   (interactive)
   (if (not (boundp 'ahg-diff-revs))
       (message "error: no revision diff information for current buffer")
     (condition-case err
         (let* ((root (ahg-root))
-               (filename (file-relative-name (diff-find-file-name) root))
+               (filename (if filename filename
+                           (file-relative-name (diff-find-file-name) root)))
                (m (message "found filename %s %s" filename ahg-diff-revs))
                (buf1 (ahg-diff-get-ediff-buffer root filename
                                                 (car ahg-diff-revs)))
