@@ -4608,14 +4608,17 @@ destination buffer. If nil, a new buffer will be used.
 current hg command."
   (interactive)
   (goto-char (point-max))
-  (let ((process (get-buffer-process (current-buffer)))
-        (msg (buffer-substring-no-properties
-              (point-at-bol) (point-at-eol)))
-        data)
-    (setq data (concat (read-string msg) "\n"))
+  (let* ((process (get-buffer-process (current-buffer)))
+         (msg (buffer-substring-no-properties
+               (point-at-bol) (point-at-eol)))
+         (is-passwd (string-match "\\<pass\\(word\\|phrase\\)\\>" msg))
+         data)
+    (setq data
+          (concat
+           (funcall (if is-passwd 'read-passwd 'read-string) msg) "\n"))
     (process-send-string process data)
     (let ((inhibit-read-only t))
-      (insert data))
+      (insert (if is-passwd "***" data)))
     (set-marker (process-mark process) (point))
     ))
 
