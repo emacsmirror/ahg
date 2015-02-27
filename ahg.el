@@ -321,7 +321,7 @@ For `nil' the default file is used."
 (defun ahg-root ()
   "Returns the root of the tree handled by Mercurial, or nil if
 the current dir is not under hg."
-  (locate-dominating-file default-directory ".hg"))
+  (expand-file-name (locate-dominating-file default-directory ".hg")))
 
 ;;-----------------------------------------------------------------------------
 ;; hg identify
