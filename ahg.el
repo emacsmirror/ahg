@@ -3808,8 +3808,8 @@ so that filename completion works on patch names."
                       (or (not (and (ahg-cd root)
                                     (= (ahg-call-process
                                         "status"
-                                        (list "-a" "-d" "-r")) 0))
-                          (> (buffer-size) 0))))))
+                                        (list "-a" "-d" "-r")) 0)))
+                          (> (buffer-size) 0)))))
     (cond (isthere
            ;; we don't want to overwrite old backups
            (error
