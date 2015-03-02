@@ -2859,63 +2859,61 @@ the files under version control."
               (interactive)
               (ahg-manifest-grep pattern glob)))))
     (if ahg-manifest-grep-use-xargs-grep
-        (progn
-          (ahg-cd root)
-          (let* ((grep-setup-hook
-                  (cons
-                   (lexical-let ((header header))
-                     (lambda ()
-                       (let ((inhibit-read-only t))
-                         (erase-buffer)
-                         (insert header)
-                         (goto-char (point-min))
-                         (forward-line 1))
-                       (set (make-local-variable
-                             'compilation-exit-message-function)
-                            (lexical-let ((buf (current-buffer)))
-                              (lambda (status code msg)
-                                (when (eq status 'exit)
-                                  (set (make-local-variable 'ahg-grep-ok)
-                                       (or (zerop code) (= code 123))))
-                                (cons msg code))))
-                       (set (make-local-variable 'compilation-finish-functions)
-                            (cons
-                             (lambda (buf msg)
-                               (with-current-buffer buf
-                                 (when (and (boundp 'ahg-grep-ok)
-                                            ahg-grep-ok)
-                                   (let ((inhibit-read-only t))
-                                     (save-excursion
-                                       (goto-char (point-max))
-                                       (forward-line -1)
-                                       (beginning-of-line)
-                                       (kill-line)
-                                       (insert
-                                        (propertize
-                                         (concat
-                                          (make-string
-                                           (1- (window-width
-                                                (selected-window))) ?-)
-                                          "\naHg grep finished at "
-                                          (substring
-                                           (current-time-string) 0 19)
-                                          "\n") 'font-lock-face 'default))
-                                       (message "aHg grep finished")
-                                       (setq mode-line-process nil)
-                                       (force-mode-line-update))))))
-                             compilation-finish-functions))))
-                   grep-setup-hook))
-                 (buf (grep
-                       (format "%s files -0 %s | xargs -0 grep -I -nHE -e %s"
-                               ahg-hg-command
-                               (shell-quote-argument (or glob ""))
-                               (shell-quote-argument pattern))))
-                 (prevbuf (get-buffer "*ahg-grep*"))
-                 (inhibit-read-only t))
-            (when (and prevbuf (not (eq prevbuf buf))) (kill-buffer prevbuf))
-            (with-current-buffer buf
-              (rename-buffer "*ahg-grep*")
-              (local-set-key "g" do-refresh))))              
+        (let* ((grep-setup-hook
+                (cons
+                 (lexical-let ((header header))
+                   (lambda ()
+                     (let ((inhibit-read-only t))
+                       (erase-buffer)
+                       (insert header)
+                       (goto-char (point-min))
+                       (forward-line 1))
+                     (set (make-local-variable
+                           'compilation-exit-message-function)
+                          (lexical-let ((buf (current-buffer)))
+                            (lambda (status code msg)
+                              (when (eq status 'exit)
+                                (set (make-local-variable 'ahg-grep-ok)
+                                     (or (zerop code) (= code 123))))
+                              (cons msg code))))
+                     (set (make-local-variable 'compilation-finish-functions)
+                          (cons
+                           (lambda (buf msg)
+                             (with-current-buffer buf
+                               (when (and (boundp 'ahg-grep-ok)
+                                          ahg-grep-ok)
+                                 (let ((inhibit-read-only t))
+                                   (save-excursion
+                                     (goto-char (point-max))
+                                     (forward-line -1)
+                                     (beginning-of-line)
+                                     (kill-line)
+                                     (insert
+                                      (propertize
+                                       (concat
+                                        (make-string
+                                         (1- (window-width
+                                              (selected-window))) ?-)
+                                        "\naHg grep finished at "
+                                        (substring
+                                         (current-time-string) 0 19)
+                                        "\n") 'font-lock-face 'default))
+                                     (message "aHg grep finished")
+                                     (setq mode-line-process nil)
+                                     (force-mode-line-update))))))
+                           compilation-finish-functions))))
+                 grep-setup-hook))
+               (buf (grep
+                     (format "%s files -0 %s | xargs -0 grep -I -nHE -e %s"
+                             ahg-hg-command
+                             (shell-quote-argument (or glob ""))
+                             (shell-quote-argument pattern))))
+               (prevbuf (get-buffer "*ahg-grep*"))
+               (inhibit-read-only t))
+          (when (and prevbuf (not (eq prevbuf buf))) (kill-buffer prevbuf))
+          (with-current-buffer buf
+            (rename-buffer "*ahg-grep*")
+            (local-set-key "g" do-refresh)))              
       (let ((buf (get-buffer-create "*ahg-grep*")))
         (with-current-buffer buf
           (pop-to-buffer buf)
@@ -3945,94 +3943,84 @@ functionalities provided by Emacs."
      buf)))
 
 
-(defun ahg-record-commit-callback (commit-cmd commit-args
-                                   root backup curpatch parent patchbuf)
+(defun ahg-record-commit-callback (commit-cmd commit-args root backup
+                                              curpatch parent patchbuf)
   (let ((args (list "-r" parent "--all" "--no-backup"))
         (buf (generate-new-buffer "*aHg-record*")))
+    (lexical-let ((root root)
+                  (backup backup)
+                  (curpatch curpatch)
+                  (parent parent)
+                  (commit-cmd commit-cmd)
+                  (commit-args commit-args)
+                  (buf buf)
+                  (patchbuf patchbuf))
+      (let* ((phase5
+              (lambda (process status)
+                (switch-to-buffer buf)
+                (if (string= status "finished\n")
+                    ;; 5. apply the backup patch
+                    (if (and (ahg-cd root)
+                             (= (ahg-call-process
+                                 "import" (list "--force" "--no-commit" backup))
+                                0))
+                        ;; 6. delete the backup files
+                        (let ((sbuf (ahg-get-status-buffer root))
+                              (cfg (with-current-buffer patchbuf
+                                     ahg-window-configuration)))
+                          (delete-file curpatch)
+                          (delete-file backup)
+                          (kill-buffer buf)
+                          (kill-buffer patchbuf)
+                          (ahg-status-maybe-refresh root)
+                          (ahg-mq-patches-maybe-refresh root)
+                          (set-window-configuration cfg)
+                          (when sbuf (pop-to-buffer sbuf))
+                          (message "changeset recorded successfully."))
+                      ;; error
+                      (ahg-show-error-msg
+                       (format "error in applying patch `%s'" backup)))
+                  ;; error
+                  (ahg-show-error process))))
+             (phase4
+              (lexical-let ((phase5 phase5))
+                (lambda (process status)
+                  (switch-to-buffer buf)
+                  (if (string= status "finished\n")
+                      (let ((args (list "--force" "--no-commit" curpatch)))
+                        ;; 2. apply the patch
+                        (if (and (ahg-cd root)
+                                 (= (ahg-call-process "import" args) 0))
+                            (ahg-generic-command
+                             commit-cmd commit-args
+                             (lexical-let ((phase5 phase5))
+                               (lambda (process status)
+                                 (switch-to-buffer buf)
+                                 (if (string= status "finished\n")
+                                     ;; 4. update to the parent rev again
+                                     (ahg-generic-command
+                                      "revert"
+                                      (list "-r" parent "--all" "--no-backup")
+                                      phase5
+                                      buf)
+                                   ;; error
+                                   (ahg-show-error process))))
+                             buf)
+                          ;; error
+                          (ahg-show-error-msg
+                           (format "error in applying patch `%s'" curpatch))))
+                    ;; error
+                    (ahg-show-error process))))))
     ;; 1. update to parent rev
-    (if (ahg-cd root)
-        (ahg-generic-command
-         "revert"
-         args
-         (lexical-let ((root root)
-                       (backup backup)
-                       (curpatch curpatch)
-                       (parent parent)
-                       (commit-cmd commit-cmd)
-                       (commit-args commit-args)
-                       (buf buf)
-                       (patchbuf patchbuf))
-           (lambda (process status)
-             (switch-to-buffer buf)
-             (if (string= status "finished\n")
-                 (let ((args (list "--force" "--no-commit" curpatch)))
-                   ;; 2. apply the patch
-                   (if (and (ahg-cd root)
-                            (= (ahg-call-process "import" args) 0))
-                       (ahg-generic-command
-                        commit-cmd commit-args
-                        (lexical-let ((root root)
-                                      (backup backup)
-                                      (curpatch curpatch)
-                                      (parent parent)
-                                      (buf buf)
-                                      (patchbuf patchbuf))
-                          (lambda (process status)
-                            (switch-to-buffer buf)
-                            (if (string= status "finished\n")
-                                ;; 4. update to the parent rev again
-                                (ahg-generic-command
-                                 "revert"
-                                 (list "-r" parent "--all" "--no-backup")
-                                 (lexical-let ((root root)
-                                               (backup backup)
-                                               (curpatch curpatch)
-                                               (parent parent)
-                                               (buf buf)
-                                               (patchbuf patchbuf))
-                                   (switch-to-buffer buf)
-                                   (lambda (process status)
-                                     (if (string= status "finished\n")
-                                         ;; 5. apply the backup patch
-                                         (if (and (ahg-cd root)
-                                                  (= (ahg-call-process
-                                                      "import"
-                                                      (list "--force"
-                                                            "--no-commit"
-                                                            backup)) 0))
-                                             ;; 6. delete the backup files
-                                             (let ((sbuf
-                                                    (ahg-get-status-buffer root))
-                                                   (cfg
-                                                    (with-current-buffer patchbuf
-                                                      ahg-window-configuration)))
-                                               (delete-file curpatch)
-                                               (delete-file backup)
-                                               (kill-buffer buf)
-                                               (kill-buffer patchbuf)
-                                               (ahg-status-maybe-refresh root)
-                                               (ahg-mq-patches-maybe-refresh root)
-                                               (set-window-configuration cfg)
-                                               (when sbuf (pop-to-buffer sbuf))
-                                               (message "changeset recorded successfully."))
-                                           ;; error
-                                           (ahg-show-error-msg
-                                            (format
-                                             "error in applying patch `%s'"
-                                             backup)))
-                                       ;; error
-                                       (ahg-show-error process))))
-                                 buf)
-                              ;; error
-                              (ahg-show-error process))))
-                        buf)
-                     ;; error
-                     (ahg-show-error-msg
-                      (format "error in applying patch `%s'" curpatch))))
-               ;; error
-               (ahg-show-error process))))
-         buf)
-      (ahg-show-error-msg (format "can't cd to %s" root) buf))))
+    (with-current-buffer buf
+      (if (ahg-cd root)
+          (ahg-generic-command
+           "revert"
+           args
+           (lexical-let ((phase4 phase4))
+             phase4)
+           buf)
+        (ahg-show-error-msg (format "can't cd to %s" root) buf)))))))
 
 
 (defun ahg-record-mq-commit (root backup curpatch parent mq-command mq-args)
@@ -4496,7 +4484,8 @@ patch editing functionalities provided by Emacs."
              (rev (ahg-histedit-rev-id rev))
              (backupfile (ahg-histedit-setup root "roll" rev))
              (msg (ahg-histedit-get-message (format "p1(%s)" rev))))
-        (ahg-histedit-do-fold "roll" msg backupfile root rev))
+        (with-temp-buffer
+          (ahg-histedit-do-fold "roll" msg backupfile root rev)))
     (error (let ((buf (generate-new-buffer "*aHg-histedit*")))
              (ahg-show-error-msg (format "aHg histedit error: %s"
                                          (error-message-string err)) buf)))))
