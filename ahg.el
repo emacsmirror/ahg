@@ -199,6 +199,11 @@ For `nil' the default file is used."
   "If true, pass --remote to summary command used by ahg-status"
   :group 'ahg :type 'boolean)
 
+(defcustom ahg-summary-git-svn-info nil
+  "If true, include info about git and/or svn revisions in the
+summary shown in ahg-status buffers"
+  :group 'ahg :type 'boolean)
+
 (defcustom ahg-manifest-grep-use-xargs-grep t
   "If true, use `xargs' and `grep' commands for implementing `ahg-manifest-grep'
  (otherwise, an elisp function is used)."
@@ -344,19 +349,41 @@ the current dir is not under hg."
 
 (defun ahg-summary-info (root)
   (with-temp-buffer
-    (let ((status (let ((default-directory (file-name-as-directory root)))
-                    (ahg-call-process 
-                     "summary" 
-                     (when ahg-summary-remote (list "--remote"))))))
-      ;; failure could mean the summary command wasn't available
-      ;; it could also mean communication with the remote repo was unsuccesful
-      ;; If we can find the word "update: " in the output, we'll assume it
-      ;; failed connecting to remote repo, but rest of summary is there.
-      (if (or (= status 0) 
-              (and ahg-summary-remote (re-search-backward "^update: " nil t)))
-          (buffer-substring-no-properties (point-min) (1- (point-max)))
-        ;; if hg summary is not available, fall back to hg identify
-        (ahg-identify root)))))
+    (let ((ret
+           (let ((status (and (ahg-cd root)
+                              (ahg-call-process 
+                               "summary" 
+                               (when ahg-summary-remote (list "--remote"))))))
+             ;; failure could mean the summary command wasn't available; it
+             ;; could also mean communication with the remote repo was
+             ;; unsuccesful If we can find the word "update: " in the output,
+             ;; we'll assume it failed connecting to remote repo, but rest of
+             ;; summary is there.
+             (if (or (= status 0) 
+                     (and ahg-summary-remote
+                          (re-search-backward "^update: " nil t)))
+                 (buffer-substring-no-properties (point-min) (1- (point-max)))
+               ;; if hg summary is not available, fall back to hg identify
+               (ahg-identify root)))))
+      (when ahg-summary-git-svn-info
+        (goto-char (point-max))
+        (let (svn git)
+          (when (save-excursion
+                  (= (ahg-call-process
+                      "log"
+                      (list "-r" "." "--template" "{svnrev}\n{gitnode}\n")) 0))
+            (setq svn (buffer-substring-no-properties (point-at-bol)
+                                                      (point-at-eol)))
+            (forward-line 1)
+            (setq git (buffer-substring-no-properties (point-at-bol)
+                                                      (point-at-eol)))
+            (unless (string= svn "")
+              (setq ret (concat ret "\nsvn:    " svn)))
+            (unless (string= git "")
+              (setq ret (concat ret "\ngit:    " git)))
+            )))
+      ret
+      )))
 
 ;;-----------------------------------------------------------------------------
 ;; hg status
