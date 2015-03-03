@@ -2861,9 +2861,11 @@ the files under version control."
     (if ahg-manifest-grep-use-xargs-grep
         (let* ((grep-setup-hook
                 (cons
-                 (lexical-let ((header header))
+                 (lexical-let ((root root)
+                               (header header))
                    (lambda ()
                      (let ((inhibit-read-only t))
+                       (ahg-cd root)
                        (erase-buffer)
                        (insert header)
                        (goto-char (point-min))
@@ -2927,7 +2929,8 @@ the files under version control."
                                                 '(:foreground "#DD0000"))))))
           (if (ahg-cd root)
               (ahg-generic-command
-               "files" (when glob (list glob))
+               "files" (list (concat "set:" (when glob (list glob " & "))
+                                     "grep(" pattern ") & ! binary()"))
                (lexical-let ((buf buf)
                              (root root)
                              (glob glob)
