@@ -1418,11 +1418,11 @@ do nothing."
       "0")))
 
 
-(defun ahg-short-log-create-ewoc ()
+(defun ahg-short-log-create-ewoc (root)
   (let* ((width (window-width (selected-window)))
          (header (concat
                   (propertize "hg log for " 'face ahg-header-line-face)
-                  (propertize default-directory 'face ahg-header-line-root-face)
+                  (propertize root 'face ahg-header-line-root-face)
                   "\n\n" (propertize (make-string width ?-) 'face 'bold) "\n"
                   (propertize "    Rev |    Date    |  Author  | Summary\n"
                               'face 'bold)
@@ -1443,8 +1443,9 @@ values (which default to tip for R1 and 0 for R2). If called with
 a prefix argument, prompts also for EXTRA-FLAGS."
   (interactive
    (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))  
-  (let ((buffer (get-buffer-create
-                 (concat "*hg log (summary): " (ahg-root) "*")))
+  (let* ((root (ahg-root))
+         (buffer (get-buffer-create
+                 (concat "*hg log (summary): " root "*")))
         (command-list (ahg-args-add-revs r1 r2)))  
     (setq command-list
           (append command-list
@@ -1456,25 +1457,27 @@ a prefix argument, prompts also for EXTRA-FLAGS."
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
+        (ahg-cd root)
         (ahg-push-window-configuration)))
     (ahg-generic-command
      "log" command-list
-     (lambda (process status)
-       (if (string= status "finished\n")
-           (with-current-buffer (process-buffer process)
-             (pop-to-buffer (current-buffer))
-             (ahg-short-log-mode)
-             (let ((contents (buffer-substring-no-properties
-                              (point-min) (point-max)))
-                   (inhibit-read-only t))
-               (erase-buffer)
-               (setq truncate-lines t)
-               (let ((ew (ahg-short-log-create-ewoc)))
-                 (ahg-short-log-insert-contents ew contents)
-                 (goto-line 6)
-                 (toggle-read-only 1)
-                 (set (make-local-variable 'ewoc) ew))))
-         (ahg-show-error process)))
+     (lexical-let ((root root))
+       (lambda (process status)
+         (if (string= status "finished\n")
+             (with-current-buffer (process-buffer process)
+               (pop-to-buffer (current-buffer))
+               (ahg-short-log-mode)
+               (let ((contents (buffer-substring-no-properties
+                                (point-min) (point-max)))
+                     (inhibit-read-only t))
+                 (erase-buffer)
+                 (setq truncate-lines t)
+                 (let ((ew (ahg-short-log-create-ewoc root)))
+                   (ahg-short-log-insert-contents ew contents)
+                   (goto-line 6)
+                   (toggle-read-only 1)
+                   (set (make-local-variable 'ewoc) ew))))
+         (ahg-show-error process))))
      buffer)))
 
 
@@ -1665,8 +1668,9 @@ values (which default to tip for R1 and 0 for R2). If called with
 a prefix argument, prompts also for EXTRA-FLAGS."
   (interactive
    (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))
-  (let ((buffer (get-buffer-create
-                 (concat "*hg log (details): " (ahg-root) "*")))
+  (let* ((root (ahg-root))
+         (buffer (get-buffer-create
+                 (concat "*hg log (details): " root "*")))
         (command-list (ahg-args-add-revs r1 r2))
         (ahgstyle (ahg-log-prepare-style-map)))
     (setq command-list (append command-list
@@ -1677,12 +1681,13 @@ a prefix argument, prompts also for EXTRA-FLAGS."
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
+        (ahg-cd root)
         (ahg-push-window-configuration)))
     (let ((proc
            (ahg-generic-command
             "log" command-list
             (lexical-let ((dn (or ahg-dir-name-for-log-command
-                                  default-directory))
+                                  root))
                           (ahgstyle ahgstyle))
               (lambda (process status)
                 (if (string= status "finished\n")
@@ -1725,14 +1730,16 @@ a prefix argument, prompts also for EXTRA-FLAGS."
       (lambda ()
         (interactive)
         (let ((fn (ahg-log-filename-at-point (point))))
-          (when (file-exists-p fn)
-            (find-file fn)))))
+          (if (file-exists-p fn)
+              (find-file fn)
+            (message "file not found: %s" fn)))))
     (define-key map "o"
       (lambda ()
         (interactive)
         (let ((fn (ahg-log-filename-at-point (point))))
-          (when (file-exists-p fn)
-            (find-file-other-window fn)))))
+          (if (file-exists-p fn)
+              (find-file-other-window fn)
+            (message "file not found: %s" fn)))))
     (define-key map "="
       (lambda ()
         (interactive)
@@ -2037,8 +2044,9 @@ values (which default to tip for R1 and 0 for R2). If called with
 a prefix argument, prompts also for EXTRA-FLAGS."
   (interactive
    (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))
-  (let ((buffer (get-buffer-create
-                 (concat "*hg glog: " (ahg-root) "*")))
+  (let* ((root (ahg-root))
+         (buffer (get-buffer-create
+                 (concat "*hg glog: " root "*")))
         (command-list (ahg-args-add-revs r1 r2)))  
     (setq command-list
           (append command-list
@@ -2050,10 +2058,11 @@ a prefix argument, prompts also for EXTRA-FLAGS."
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
+        (ahg-cd root)
         (ahg-push-window-configuration)))
     (ahg-generic-command
      "glog" command-list
-     (lexical-let ((dn (or ahg-dir-name-for-log-command default-directory)))
+     (lexical-let ((dn (or ahg-dir-name-for-log-command root)))
        (lambda (process status)
          (if (string= status "finished\n")
              (progn
@@ -2941,6 +2950,7 @@ the files under version control."
                (inhibit-read-only t))
           (when (and prevbuf (not (eq prevbuf buf))) (kill-buffer prevbuf))
           (with-current-buffer buf
+            (ahg-cd root)
             (rename-buffer "*ahg-grep*")
             (local-set-key "g" do-refresh)))              
       (let ((buf (get-buffer-create "*ahg-grep*")))
