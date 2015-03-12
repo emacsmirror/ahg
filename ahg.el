@@ -4801,6 +4801,7 @@ Commands:
 
 (defun ahg-log-edit-hook (&optional extra-message content)
   (erase-buffer)
+  (font-lock-mode 0)
   (let ((user
          (with-temp-buffer
            (if (and
@@ -4818,16 +4819,16 @@ Commands:
         (changed (log-edit-files))
         (root-regexp (concat "^" (regexp-quote default-directory))))
     (insert
-     (format "%s
-
-HG: Enter commit message.  Lines beginning with 'HG:' are removed.
+     (or content "") "\n\n"
+     (propertize
+      (format
+       "HG: Enter commit message.  Lines beginning with 'HG:' are removed.
 %sHG: --
 HG: user: %s
 HG: root: %s
 HG: branch: %s
 HG: committing %s
 HG: Press C-c C-c when you are done editing."
-             (or content "")
              (if extra-message
                  (concat
                   (mapconcat (lambda (s) (concat "HG: " s))
@@ -4840,7 +4841,8 @@ HG: Press C-c C-c when you are done editing."
                  (mapconcat
                   (lambda (s) (replace-regexp-in-string root-regexp "" s))
                   changed " ")
-               "ALL CHANGES (run 'ahg-status' for the details)")))
+               "ALL CHANGES (run 'ahg-status' for the details)"))
+      'face font-lock-comment-face))
   (goto-char (point-min))))
 
 (defun ahg-log-edit (callback file-list-function buffer &optional msg content)
