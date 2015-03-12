@@ -2907,6 +2907,12 @@ the files under version control."
                        (insert header)
                        (goto-char (point-min))
                        (forward-line 1))
+                     (when (version<= "24.4" emacs-version)
+                       (font-lock-add-keywords
+                        nil
+                        '(("^aHg grep.*$"
+                           (0 '(face nil compilation-message nil
+                                     help-echo nil mouse-face nil) t)))))
                      (set (make-local-variable
                            'compilation-exit-message-function)
                           (lexical-let ((buf (current-buffer)))
@@ -2936,10 +2942,15 @@ the files under version control."
                                         "\naHg grep finished at "
                                         (substring
                                          (current-time-string) 0 19)
-                                        "\n") 'font-lock-face 'default))
+                                        "\n")
+                                       'font-lock-face 'default))
                                      (message "aHg grep finished")
                                      (setq mode-line-process nil)
-                                     (force-mode-line-update))))))
+                                     (force-mode-line-update))
+                                   (goto-char (point-min))
+                                   (forward-line 1)
+                                   (redisplay)
+                                   ))))
                            compilation-finish-functions))))
                  grep-setup-hook))
                (buf (grep
