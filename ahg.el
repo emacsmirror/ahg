@@ -2775,6 +2775,7 @@ that buffer is refreshed instead.)"
            (progn
              (pop-to-buffer (process-buffer process))
              (help-mode)
+             (view-mode)
              (local-set-key "!" 'ahg-do-command)
              (let ((mymap (copy-keymap
                            (cdr (assq 'view-mode minor-mode-map-alist)))))
