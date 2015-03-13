@@ -1655,11 +1655,11 @@ buffer, do nothing."
 file = \"{file}\\n\"
 ")
 
-(defun ahg-log-prepare-style-map ()
-  (let ((f (make-temp-file "ahg")))
+(defun ahg-log-prepare-style-map (root)
+  (let ((f (concat (file-name-as-directory root) ".hg/ahg-log-style-map")))
     (with-temp-file f
       (insert ahg-log-style-map))
-    f))
+    (file-relative-name f root)))
   
 (defun ahg-log (r1 r2 &optional extra-flags)
   "Run hg log. R1 and R2 specify the range of revisions to
@@ -1670,9 +1670,9 @@ a prefix argument, prompts also for EXTRA-FLAGS."
    (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))
   (let* ((root (ahg-root))
          (buffer (get-buffer-create
-                 (concat "*hg log (details): " root "*")))
+                  (concat "*hg log (details): " root "*")))
         (command-list (ahg-args-add-revs r1 r2))
-        (ahgstyle (ahg-log-prepare-style-map)))
+        (ahgstyle (ahg-log-prepare-style-map root)))
     (setq command-list (append command-list
                                (list "--style" ahgstyle)
                                (when extra-flags (split-string extra-flags))))
@@ -1683,28 +1683,25 @@ a prefix argument, prompts also for EXTRA-FLAGS."
         (erase-buffer)
         (ahg-cd root)
         (ahg-push-window-configuration)))
-    (let ((proc
-           (ahg-generic-command
-            "log" command-list
-            (lexical-let ((dn (or ahg-dir-name-for-log-command
-                                  root))
-                          (ahgstyle ahgstyle))
-              (lambda (process status)
-                (if (string= status "finished\n")
-                    (progn
-                      (pop-to-buffer (process-buffer process))
-                      (ahg-format-log-buffer)
-                      (ahg-log-mode)
-                      (goto-char (point-min))
-                      (let ((inhibit-read-only t))
-                        (insert
-                         (propertize "hg log for " 'face ahg-header-line-face)
-                         (propertize dn 'face ahg-header-line-root-face)
-                         "\n\n"))
-                      (delete-file ahgstyle))
-                  (ahg-show-error process))))
-            buffer)))
-      )))
+    (ahg-generic-command
+     "log" command-list
+     (lexical-let ((dn (or ahg-dir-name-for-log-command
+                           root))
+                   (ahgstyle ahgstyle))
+       (lambda (process status)
+         (if (string= status "finished\n")
+             (progn
+               (pop-to-buffer (process-buffer process))
+               (ahg-format-log-buffer)
+               (ahg-log-mode)
+               (goto-char (point-min))
+               (let ((inhibit-read-only t))
+                 (insert
+                  (propertize "hg log for " 'face ahg-header-line-face)
+                  (propertize dn 'face ahg-header-line-root-face)
+                  "\n\n")))
+           (ahg-show-error process))))
+     buffer)))
 
 (defvar ahg-log-file-line-map
   (let ((map (make-sparse-keymap)))
