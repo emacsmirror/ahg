@@ -326,7 +326,8 @@ summary shown in ahg-status buffers"
 (defun ahg-root ()
   "Returns the root of the tree handled by Mercurial, or nil if
 the current dir is not under hg."
-  (expand-file-name (locate-dominating-file default-directory ".hg")))
+  (file-name-as-directory (expand-file-name
+                           (locate-dominating-file default-directory ".hg"))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg identify
@@ -1671,8 +1672,9 @@ a prefix argument, prompts also for EXTRA-FLAGS."
   (let* ((root (ahg-root))
          (buffer (get-buffer-create
                   (concat "*hg log (details): " root "*")))
-        (command-list (ahg-args-add-revs r1 r2))
-        (ahgstyle (ahg-log-prepare-style-map root)))
+         (command-list (ahg-args-add-revs r1 r2))
+         (ahgstyle (ahg-log-prepare-style-map root))
+         (default-directory root))
     (setq command-list (append command-list
                                (list "--style" ahgstyle)
                                (when extra-flags (split-string extra-flags))))
@@ -1721,7 +1723,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
           (goto-char pt)
           (let* ((r1 (ahg-log-revision-at-point t))
                  (r2 (ahg-first-parent-of-rev r1))
-                 (fn (ahg-log-filename-at-point pt)))
+                 (fn (ahg-log-filename-at-point pt t)))
             (ahg-diff r2 r1 (list fn))))))
     (define-key map "f"
       (lambda ()
@@ -1742,20 +1744,19 @@ a prefix argument, prompts also for EXTRA-FLAGS."
         (interactive)
           (let* ((r1 (ahg-log-revision-at-point t))
                  (r2 (ahg-first-parent-of-rev r1))
-                 (fn (ahg-log-filename-at-point (point))))
+                 (fn (ahg-log-filename-at-point (point) t)))
             (ahg-diff r2 r1 (list fn)))))
     (define-key map "e"
       (lambda ()
         (interactive)
           (let* ((r1 (ahg-log-revision-at-point t))
                  (r2 (ahg-first-parent-of-rev r1))
-                 (fn (file-relative-name
-                      (ahg-log-filename-at-point (point)) (ahg-root))))
+                 (fn (ahg-log-filename-at-point (point) t)))
             (let ((ahg-diff-revs (cons (ahg-rev-id r1) (ahg-rev-id r2))))
               (ahg-diff-ediff fn)))))
     map))
 
-(defun ahg-log-filename-at-point (point)
+(defun ahg-log-filename-at-point (point &optional relative)
   (interactive "d")
   (let ((fn 
          (save-excursion
@@ -1764,7 +1765,9 @@ a prefix argument, prompts also for EXTRA-FLAGS."
             (+ 13 ;; (length "             ")
                (point-at-bol))
             (point-at-eol)))))
-    (ahg-abspath fn)))
+    (if relative
+        fn
+      (ahg-abspath fn))))
 
 (defun ahg-format-log-buffer ()
   (goto-char (point-min))
@@ -1859,8 +1862,11 @@ prompts also for extra flags."
   (interactive "P")
   (cond ((eq major-mode 'ahg-status-mode) (call-interactively 'ahg-status-log))
         ((buffer-file-name)
-         (let ((ahg-file-list-for-log-command (list (buffer-file-name)))
-               (ahg-dir-name-for-log-command (buffer-file-name)))
+         (let* ((root (ahg-root))
+                (filename (buffer-file-name))
+                (ahg-file-list-for-log-command
+                 (list (file-relative-name filename root)))
+                (ahg-dir-name-for-log-command filename))
            (if prefix
                (apply 'ahg-log   
                       (ahg-log-read-args nil (equal current-prefix-arg '(16))))
