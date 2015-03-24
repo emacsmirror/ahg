@@ -326,8 +326,10 @@ summary shown in ahg-status buffers"
 (defun ahg-root ()
   "Returns the root of the tree handled by Mercurial, or nil if
 the current dir is not under hg."
-  (file-name-as-directory (expand-file-name
-                           (locate-dominating-file default-directory ".hg"))))
+  (let ((f (locate-dominating-file default-directory ".hg")))
+    (if f
+        (file-name-as-directory (expand-file-name f))
+      (error "aHg: no repository found in %s" default-directory))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg identify
