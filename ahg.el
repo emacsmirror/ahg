@@ -2961,7 +2961,7 @@ the files under version control."
                (buf (grep
                      (format "%s files -0 %s | xargs -0 grep -I -nHE -e %s"
                              ahg-hg-command
-                             (shell-quote-argument (or glob ""))
+                             (if glob (concat "'glob:" glob "'") "")
                              (shell-quote-argument pattern))))
                (prevbuf (get-buffer "*ahg-grep*"))
                (inhibit-read-only t))
