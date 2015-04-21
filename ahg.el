@@ -2860,6 +2860,14 @@ that buffer is refreshed instead.)"
              (kill-buffer (process-buffer process)))))))))
 
 
+(defun ahg-manifest-grep-read (root)
+  (let ((glob (read-string "Files to search: ")))
+    (when (ahg-string-match-p "^\\./" glob)
+      (setq glob (concat (file-name-as-directory
+                          (file-relative-name default-directory root))
+                         (substring glob 2))))
+    glob))
+
 (defun ahg-manifest-grep (pattern glob)
   "Search for grep-like pattern in the working directory, considering only
 the files under version control."
@@ -2878,7 +2886,7 @@ the files under version control."
                                (query-replace-descr default))
                      "Search for pattern: "))))
       (if (and input (> (length input) 0)) input default))
-    (if current-prefix-arg (read-string "Files to search: ") nil)))
+    (if current-prefix-arg (ahg-manifest-grep-read (ahg-root)) nil)))
   (let* ((root (ahg-root))
          (header
           (concat (propertize "searching for pattern "
