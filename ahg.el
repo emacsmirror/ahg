@@ -58,6 +58,10 @@
                       ["Log Summary" ahg-short-log t]
                       ["Detailed Log" ahg-log t]
                       ["Revision DAG" ahg-glog t]
+                      ["Heads" ahg-heads t]
+                      ["Tags" ahg-tags t]
+                      ["Bookmarks" ahg-bookmarks t]
+                      ["--" nil nil]
                       ["Commit Current File" ahg-commit-cur-file t]
                       ["View Changes of Current File" ahg-diff-cur-file t]
                       ["View Ediff of Current File" ahg-diff-ediff-cur-file t]
@@ -94,6 +98,9 @@
     (define-key map "L" 'ahg-log)
     (define-key map "G" 'ahg-glog)
     (define-key map "g" 'ahg-glog)
+    (define-key map "H" 'ahg-heads)
+    (define-key map "T" 'ahg-tags)
+    (define-key map "B" 'ahg-bookmarks)
     (define-key map "!" 'ahg-do-command)
     (define-key map "h" 'ahg-command-help)
     (define-key map "c" 'ahg-commit-cur-file)
@@ -442,6 +449,9 @@ Commands:
   (define-key ahg-status-mode-map "l" 'ahg-status-short-log)
   (define-key ahg-status-mode-map "L" 'ahg-status-log)
   (define-key ahg-status-mode-map "G" 'ahg-status-glog)
+  (define-key ahg-status-mode-map "H" 'ahg-heads)
+  (define-key ahg-status-mode-map "T" 'ahg-tags)
+  (define-key ahg-status-mode-map "B" 'ahg-bookmarks)
   (define-key ahg-status-mode-map "f" 'ahg-status-visit-file)
   (define-key ahg-status-mode-map "\r" 'ahg-status-visit-file)
   (define-key ahg-status-mode-map "o" 'ahg-status-visit-file-other-window)
@@ -516,6 +526,10 @@ Commands:
     ["Log Summary" ahg-short-log [:keys "l" :active t]]
     ["Detailed Log" ahg-log [:keys "L" :active t]]
     ["Revision DAG" ahg-glog [:keys "G" :active t]]
+    ["Heads" ahg-heads [:keys "H" :active t]]
+    ["Tags" ahg-tags [:keys "T" :active t]]
+    ["Bookmarks" ahg-bookmarks [:keys "B" :active t]]
+    ["--" nil nil]
     ["Diff" ahg-status-diff [:keys "=" :active t]]
     ["Diff Marked" ahg-status-diff-all [:keys "D" :active t]]
     ["Ediff" ahg-status-diff-ediff [:keys "e" :active t]]
@@ -1421,14 +1435,17 @@ do nothing."
       "0")))
 
 
-(defun ahg-short-log-create-ewoc (root)
+(defun ahg-short-log-create-ewoc (header-prefix last-colunm-title root)
   (let* ((width (window-width (selected-window)))
          (header (concat
-                  (propertize "hg log for " 'face ahg-header-line-face)
+                  (propertize (concat header-prefix " for ")
+                              'face ahg-header-line-face)
                   (propertize root 'face ahg-header-line-root-face)
                   "\n\n" (propertize (make-string width ?-) 'face 'bold) "\n"
-                  (propertize "    Rev |    Date    |  Author  | Summary\n"
-                              'face 'bold)
+                  (propertize
+                   (concat "    Rev |    Date    |  Author  | "
+                           last-colunm-title "\n")
+                   'face 'bold)
                   (propertize (make-string width ?-) 'face 'bold)))
          (footer (propertize (make-string width ?-) 'face 'bold))
          (ew (ewoc-create 'ahg-short-log-pp header footer)))
@@ -1436,24 +1453,18 @@ do nothing."
 
 (defvar ahg-file-list-for-log-command nil)
 
-(defun ahg-short-log (r1 r2 &optional extra-flags)
-  "Run hg log, in a compressed format.
-This displays the log in a tabular view, one line per
-changeset. The format of each line is: Revision | Date | User | Summary.
-R1 and R2 specify the range of revisions to
-consider. When run interactively, the user must enter their
-values (which default to tip for R1 and 0 for R2). If called with
-a prefix argument, prompts also for EXTRA-FLAGS."
-  (interactive
-   (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))  
+(defun ahg-short-log-impl (buffer-name-prefix template-extra last-column-title
+                           r1 r2 extra-flags)
   (let* ((root (ahg-root))
          (buffer (get-buffer-create
-                 (concat "*hg log (summary): " root "*")))
+                 (concat "*" buffer-name-prefix ": " root "*")))
         (command-list (ahg-args-add-revs r1 r2)))  
     (setq command-list
           (append command-list
                   (list "--template"
-                        "{rev} {date|shortdate} {author|user} {desc|firstline}\\n")
+                        (concat "{rev} {date|shortdate} {author|user} "
+                                template-extra
+                                "\\n"))
                   (when extra-flags (split-string extra-flags))))
     (when ahg-file-list-for-log-command
       (setq command-list (append command-list ahg-file-list-for-log-command)))
@@ -1464,7 +1475,9 @@ a prefix argument, prompts also for EXTRA-FLAGS."
         (ahg-push-window-configuration)))
     (ahg-generic-command
      "log" command-list
-     (lexical-let ((root root))
+     (lexical-let ((root root)
+                   (buffer-name-prefix buffer-name-prefix)
+                   (last-column-title last-column-title))
        (lambda (process status)
          (if (string= status "finished\n")
              (with-current-buffer (process-buffer process)
@@ -1475,13 +1488,28 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                      (inhibit-read-only t))
                  (erase-buffer)
                  (setq truncate-lines t)
-                 (let ((ew (ahg-short-log-create-ewoc root)))
+                 (let ((ew (ahg-short-log-create-ewoc
+                            buffer-name-prefix last-column-title root)))
                    (ahg-short-log-insert-contents ew contents)
                    (goto-line 6)
                    (toggle-read-only 1)
                    (set (make-local-variable 'ewoc) ew))))
          (ahg-show-error process))))
      buffer)))
+
+
+(defun ahg-short-log (r1 r2 &optional extra-flags)
+  "Run hg log, in a compressed format.
+This displays the log in a tabular view, one line per
+changeset. The format of each line is: Revision | Date | User | Summary.
+R1 and R2 specify the range of revisions to
+consider. When run interactively, the user must enter their
+values (which default to tip for R1 and 0 for R2). If called with
+a prefix argument, prompts also for EXTRA-FLAGS."
+  (interactive
+   (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))
+  (ahg-short-log-impl "hg log (summary)" "{desc|firstline}" "Summary"
+                      r1 r2 extra-flags))
 
 
 (defun ahg-short-log-histedit-mess ()
@@ -2592,6 +2620,31 @@ Lets you step back in time for that line."
    ahg-annotate-current-file 
    (ahg-annotate-revision-at-line)
    (ahg-annotate-line-at-line)))
+
+;;-----------------------------------------------------------------------------
+;; hg heads, bookmarks and tags
+;;-----------------------------------------------------------------------------
+
+(defun ahg-heads ()
+  "Show the heads of the repository in a tabular view, similar to `ahg-short-log'."
+  (interactive)
+  (ahg-short-log-impl "hg heads" "{if(tags, '[{tags}]  ')}{if(bookmarks, '\\{{bookmarks}}  ')}" "[Tags] {Bookmarks}"
+                      "head() and tip:0" nil nil))
+
+
+(defun ahg-tags ()
+  "Show the tags of the repository in a tabular view, similar to `ahg-short-log'."
+  (interactive)
+  (ahg-short-log-impl "hg tags" "{tags}" "Tag Name"
+                      "tag(\"re:.*\") and tip:0" nil nil))
+
+
+(defun ahg-bookmarks ()
+  "Show the bookmarks of the repository in a tabular view, similar to `ahg-short-log'."
+  (interactive)
+  (ahg-short-log-impl "hg bookmarks" "{bookmarks}" "Bookmark Name"
+                      "bookmark() and tip:0" nil nil))
+
 
 ;;-----------------------------------------------------------------------------
 ;; hg command
