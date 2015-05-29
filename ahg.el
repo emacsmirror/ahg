@@ -216,6 +216,10 @@ summary shown in ahg-status buffers"
  (otherwise, an elisp function is used)."
   :group 'ahg :type 'boolean)
 
+(defcustom ahg-diff-keep-current-buffer nil
+  "If true, keep the focus on the current buffer when showing diffs."
+  :group 'ahg :type 'boolean)
+
 (defface ahg-status-marked-face
   '((default (:inherit font-lock-preprocessor-face)))
   "Face for marked files in aHg status buffers." :group 'ahg)
@@ -2299,16 +2303,18 @@ Commands:
     (ahg-generic-command
      "diff" command-list
      (lexical-let ((r1 r1)
-                   (r2 r2))
+                   (r2 r2)
+                   (win (when ahg-diff-keep-current-buffer (selected-window))))
        (lambda (process status)
          (if (string= status "finished\n")
              (progn
-               (pop-to-buffer (process-buffer process))
+               (pop-to-buffer (process-buffer process) nil win)
                (ahg-set-diff-mode
                 (cond ((and r1 r2) (cons (ahg-rev-id r2) (ahg-rev-id r1)))
                       (r1 (cons nil (ahg-rev-id r1)))
                       (t (cons nil (ahg-rev-id ".")))))
-               (goto-char (point-min)))
+               (goto-char (point-min))
+               (when win (select-window win)))
            (ahg-show-error process))))
      buffer)))
 
