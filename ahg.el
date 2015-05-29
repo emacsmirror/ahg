@@ -459,6 +459,8 @@ Commands:
   (define-key ahg-status-mode-map "$" 'ahg-status-shell-command)
   (define-key ahg-status-mode-map "F" 'ahg-status-dired-find)
   (define-key ahg-status-mode-map "d" 'ahg-status-delete)
+  (define-key ahg-status-mode-map "n" 'ahg-status-next-file)
+  (define-key ahg-status-mode-map "p" 'ahg-status-prev-file)
   (let ((showmap (make-sparse-keymap)))
     (define-key showmap "s" 'ahg-status-show-default)
     (define-key showmap "A" 'ahg-status-show-all)
@@ -1088,6 +1090,25 @@ Uses find-dired to get them into nicely."
           (write-file hgignore)
           (kill-buffer))
         (ahg-status-maybe-refresh aroot)))))
+
+
+(defun ahg-status-next-file ()
+  "Move to the next file in an ahg-status buffer."
+  (interactive)
+  (let* ((cur (ewoc-locate ewoc))
+         (node (and cur (ewoc-next ewoc cur))))
+    (when node
+      (goto-char (ewoc-location node)))))
+
+
+(defun ahg-status-prev-file ()
+  "Move to the previous file in an ahg-status buffer."
+  (interactive)
+  (let* ((cur (ewoc-locate ewoc))
+         (node (and cur (ewoc-prev ewoc cur))))
+    (when node
+      (goto-char (ewoc-location node)))))
+
 
 ;;-----------------------------------------------------------------------------
 ;; hg commit
