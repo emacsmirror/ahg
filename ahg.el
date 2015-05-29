@@ -1187,7 +1187,7 @@ flag to hg update."
 
 (defvar ahg-short-log-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [?g] 'ahg-short-log)
+    (define-key map [?g] 'ahg-short-log-refresh)
     (define-key map [?s] 'ahg-status)
     (define-key map [?=] 'ahg-short-log-view-diff)
     (define-key map [?D] 'ahg-short-log-view-diff-select-rev)
@@ -1257,7 +1257,7 @@ Commands:
     ["--" nil nil]
     ["Help on Hg Command" ahg-command-help [:keys "h" :active t]]
     ["--" nil nil]
-    ["Refresh" ahg-short-log [:keys "g" :active t]]
+    ["Refresh" ahg-short-log-refresh [:keys "g" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]
     ))
 
@@ -1453,21 +1453,9 @@ do nothing."
 
 (defvar ahg-file-list-for-log-command nil)
 
-(defun ahg-short-log-impl (buffer-name-prefix template-extra last-column-title
-                           r1 r2 extra-flags)
-  (let* ((root (ahg-root))
-         (buffer (get-buffer-create
-                 (concat "*" buffer-name-prefix ": " root "*")))
-        (command-list (ahg-args-add-revs r1 r2)))  
-    (setq command-list
-          (append command-list
-                  (list "--template"
-                        (concat "{rev} {date|shortdate} {author|user} "
-                                template-extra
-                                "\\n"))
-                  (when extra-flags (split-string extra-flags))))
-    (when ahg-file-list-for-log-command
-      (setq command-list (append command-list ahg-file-list-for-log-command)))
+(defun ahg-do-short-log (root buffer-name-prefix last-colunm-title command-list)
+  (let* ((buffer (get-buffer-create
+                  (concat "*" buffer-name-prefix ": " root "*"))))
     (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
@@ -1477,7 +1465,8 @@ do nothing."
      "log" command-list
      (lexical-let ((root root)
                    (buffer-name-prefix buffer-name-prefix)
-                   (last-column-title last-column-title))
+                   (last-column-title last-column-title)
+                   (command-list command-list))
        (lambda (process status)
          (if (string= status "finished\n")
              (with-current-buffer (process-buffer process)
@@ -1488,6 +1477,8 @@ do nothing."
                      (inhibit-read-only t))
                  (erase-buffer)
                  (setq truncate-lines t)
+                 (set (make-local-variable 'ahg-short-log-data)
+                      (list buffer-name-prefix last-column-title command-list))
                  (let ((ew (ahg-short-log-create-ewoc
                             buffer-name-prefix last-column-title root)))
                    (ahg-short-log-insert-contents ew contents)
@@ -1496,6 +1487,22 @@ do nothing."
                    (set (make-local-variable 'ewoc) ew))))
          (ahg-show-error process))))
      buffer)))
+  
+
+(defun ahg-short-log-impl (buffer-name-prefix template-extra last-column-title
+                           r1 r2 extra-flags)
+  (let ((root (ahg-root))
+        (command-list (ahg-args-add-revs r1 r2)))
+    (setq command-list
+          (append command-list
+                  (list "--template"
+                        (concat "{rev} {date|shortdate} {author|user} "
+                                template-extra
+                                "\\n"))
+                  (when extra-flags (split-string extra-flags))))
+    (when ahg-file-list-for-log-command
+      (setq command-list (append command-list ahg-file-list-for-log-command)))
+    (ahg-do-short-log root buffer-name-prefix last-column-title command-list)))
 
 
 (defun ahg-short-log (r1 r2 &optional extra-flags)
@@ -1546,6 +1553,16 @@ a prefix argument, prompts also for EXTRA-FLAGS."
   (let ((rev (ahg-short-log-revision-at-point)))
     (when (ahg-y-or-n-p (format "Roll revision %s? " rev))
       (ahg-histedit-roll rev))))
+
+(defun ahg-short-log-refresh ()
+  (interactive)
+  (if (boundp 'ahg-short-log-data)
+      (let ((buffer-name-prefix (nth 0 ahg-short-log-data))
+            (last-column-title (nth 1 ahg-short-log-data))
+            (command-list (nth 2 ahg-short-log-data)))
+        (ahg-do-short-log (ahg-root)
+                          buffer-name-prefix last-column-title command-list))
+    (call-interactively 'ahg-short-log)))
 
 
 (defvar ahg-log-font-lock-keywords
