@@ -2503,14 +2503,16 @@ used.
                     (if (string= status "finished\n")
                         (progn
                           (pop-to-buffer buffer)
+                          (goto-char (point-min))
                           (while (re-search-forward
                                   (concat
                                    "^ *[^ ]+ +[0-9]+ "
                                    "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]:"
                                    " *\\([0-9]+\\):") nil t)
                             (let ((aline (match-string 1))
+                                  (beg (point-at-bol))
                                   (end (point-at-eol)))
-                              (put-text-property (point) end
+                              (put-text-property beg end
                                                  'ahg-line-number aline)
                               (goto-char (1+ end))))
                           (goto-line line)
