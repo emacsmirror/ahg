@@ -4051,6 +4051,7 @@ so that filename completion works on patch names."
              (parent (caddr data))
              (patchbuf (cadddr data)))
         (switch-to-buffer patchbuf)
+        (ahg-cd root)
         (ahg-set-diff-mode)
         (toggle-read-only nil)
         (local-set-key
