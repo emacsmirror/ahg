@@ -1504,10 +1504,23 @@ do nothing."
                  (setq truncate-lines t)
                  (set (make-local-variable 'ahg-short-log-data)
                       (list buffer-name-prefix last-column-title command-list))
-                 (let ((ew (ahg-short-log-create-ewoc
-                            buffer-name-prefix last-column-title root)))
+                 (let* ((ew (ahg-short-log-create-ewoc
+                             buffer-name-prefix last-column-title root))
+                        (rev (ahg-rev-id "." "{rev}"))
+                        (revre (if rev (concat "^ *" (regexp-quote rev)) ""))
+                        (done (null rev)))
                    (ahg-short-log-insert-contents ew contents)
                    (goto-line 6)
+                   (beginning-of-line)
+                   (save-excursion
+                     (while (and (not done) (not (eobp)))
+                       (if (looking-at revre)
+                           (progn
+                             (setq done t)
+                             (forward-word 1)
+                             (delete-char 1)
+                             (insert (propertize "*" 'face 'bold)))
+                         (forward-line 1))))
                    (toggle-read-only 1)
                    (set (make-local-variable 'ewoc) ew))))
          (ahg-show-error process))))
@@ -4659,10 +4672,11 @@ patch editing functionalities provided by Emacs."
 ;; Various helper functions
 ;;-----------------------------------------------------------------------------
 
-(defun ahg-rev-id (rev)
+(defun ahg-rev-id (rev &optional which)
+  (unless which (setq which "{node|short}"))
   (with-temp-buffer
     (if (= (ahg-call-process "log"
-                             (list "-r" rev "--template" "{node|short} ")) 0)
+                             (list "-r" rev "--template" (concat which " "))) 0)
         (let ((node (buffer-substring-no-properties (point-min)
                                                     (1- (point-max)))))
           node))))
