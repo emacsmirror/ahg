@@ -4755,9 +4755,10 @@ destination buffer. If nil, a new buffer will be used.
 (defun ahg-show-error (process)
   "Displays an error message for the given process."
   (let ((buf (process-buffer process)))
-    (pop-to-buffer buf)
-    (goto-char (point-min))
-    (ahg-command-mode)
+    (when (buffer-live-p buf)
+      (pop-to-buffer buf)
+      (goto-char (point-min))
+      (ahg-command-mode))
     (message "aHg command exited with non-zero status: %s"
              (mapconcat 'identity (process-command process) " "))))
 
