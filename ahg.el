@@ -1429,11 +1429,23 @@ do nothing."
            (concat "hg log"
                    (if is-on-selected-files " (on selected files)" "")
                    ", R1: ") (car ahg-log-default-revisions)))
+         (is-revset (ahg-maybe-revset firstrev))
+         (firstarg-to-save firstrev)
          (retval
           (append
            (list
-            firstrev
-            (when (not (ahg-maybe-revset firstrev))
+            (progn
+              (when is-revset
+                (let* ((limit (string-to-number
+                               (read-string "hg log, limit (optional): "))))
+                  (cond ((< limit 0)
+                         (setq firstrev
+                               (format "first(%s,%s)" firstrev (- limit))))
+                        ((> limit 0)
+                         (setq firstrev
+                               (format "last(%s,%s)" firstrev limit))))))
+              firstrev)
+            (when (not is-revset)
               (read-string
                (concat "hg log"
                        (if is-on-selected-files " (on selected files)" "")
@@ -1445,7 +1457,7 @@ do nothing."
                             ", extra switches: ")
                     ahg-log-default-extra-flags))))))
     ;; remember the values entered for the next call
-    (setq ahg-log-default-revisions (cons (car retval) (cadr retval)))
+    (setq ahg-log-default-revisions (cons firstarg-to-save (cadr retval)))
     (when read-extra-flags
       (setq ahg-log-default-extra-flags (caddr retval)))
     retval))
