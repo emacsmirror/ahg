@@ -1289,6 +1289,10 @@ Commands:
     ))
 
 
+(defun ahg-short-log-propertize (s)
+  (propertize s 'mouse-face 'highlight
+              'keymap ahg-short-log-line-map))
+
 (defun ahg-short-log-pp (data)
   "Pretty-printer for short log revisions."
   ;; data is a 4-elements list
@@ -1306,8 +1310,7 @@ Commands:
            (pad (if (< (length s) width)
                     (make-string (- width (length s)) ? )
                   "")))
-      (insert (propertize (concat s pad) 'mouse-face 'highlight
-                          'keymap ahg-short-log-line-map
+      (insert (propertize (ahg-short-log-propertize (concat s pad))
                           'help-echo p4)))))
         
 (defun ahg-short-log-insert-contents (ewoc contents)
@@ -1513,7 +1516,8 @@ do nothing."
     ew))
 
 (defvar ahg-file-list-for-log-command nil)
-(defconst ahg-short-log-active-rev-marker (propertize "*" 'face 'bold))
+(defconst ahg-short-log-active-rev-marker (ahg-short-log-propertize
+                                           (propertize "*" 'face 'bold)))
 
 (defun ahg-do-short-log (root buffer-name-prefix last-colunm-title command-list)
   (let* ((buffer (get-buffer-create
