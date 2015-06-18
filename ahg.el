@@ -1169,6 +1169,7 @@ Uses find-dired to get them into nicely."
 
 (defvar ahg-update-to-rev-get-revision-function nil)
 (defvar ahg-update-to-rev-check-bookmarks nil)
+(defvar ahg-update-to-rev-refresh-function nil)
 
 (defun ahg-update-to-rev (rev force)
   "Update to the given revision. If force is non-nil, pass -C
@@ -1196,7 +1197,8 @@ flag to hg update."
        "update" args
        (lexical-let ((aroot default-directory)
                      (rev rev)
-                     (refresh (symbol-function 'ahg-status-maybe-refresh)))
+                     (refresh (or ahg-update-to-rev-refresh-function
+                                  (symbol-function 'ahg-status-maybe-refresh))))
          (lambda (process status)
            (if (string= status "finished\n")
                (progn
@@ -1390,7 +1392,29 @@ do nothing."
   (interactive)
   (let ((ahg-update-to-rev-get-revision-function
          'ahg-short-log-revision-at-point)
-        (ahg-update-to-rev-check-bookmarks t))
+        (ahg-update-to-rev-check-bookmarks t)
+        (ahg-update-to-rev-refresh-function
+         (lexical-let ((buf (current-buffer)))
+           (lambda (root)
+             (with-current-buffer buf
+               (let ((inhibit-read-only t))
+                 (save-excursion
+                   (let ((n (ewoc-nth ewoc 0)) done)
+                     (while (and n (not done))
+                       (goto-char (ewoc-location n))
+                       (if (re-search-forward
+                            "^ *[0-9]+\\*" (point-at-eol) t)
+                           (progn
+                             (setq done t)
+                             (delete-char -1)
+                             (insert " "))
+                         (setq n (ewoc-next ewoc n))))))
+                 (save-excursion
+                   (beginning-of-line)
+                   (forward-word 1)
+                   (insert ahg-short-log-active-rev-marker)
+                   (delete-char 1))))
+             (ahg-status-maybe-refresh root)))))
     (call-interactively 'ahg-update-to-rev)))
 
 
@@ -1489,6 +1513,7 @@ do nothing."
     ew))
 
 (defvar ahg-file-list-for-log-command nil)
+(defconst ahg-short-log-active-rev-marker (propertize "*" 'face 'bold))
 
 (defun ahg-do-short-log (root buffer-name-prefix last-colunm-title command-list)
   (let* ((buffer (get-buffer-create
@@ -1531,7 +1556,7 @@ do nothing."
                              (setq done t)
                              (forward-word 1)
                              (delete-char 1)
-                             (insert (propertize "*" 'face 'bold)))
+                             (insert ahg-short-log-active-rev-marker))
                          (forward-line 1))))
                    (toggle-read-only 1)
                    (set (make-local-variable 'ewoc) ew))))
@@ -2131,6 +2156,11 @@ Commands:
     (re-search-backward ahg-glog-start-regexp)
     (match-string-no-properties 2)))
 
+(defun ahg-glog-goto-revision-line ()
+  (end-of-line)
+  (re-search-backward ahg-glog-start-regexp)
+  (beginning-of-line))
+
 (defun ahg-glog-view-details ()
   "View details of the given revision."
   (interactive)
@@ -2208,7 +2238,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                                (re-search-forward ahg-glog-start-regexp
                                                   nil t))))))
                    (save-excursion
-                     (beginning-of-line)
+                     (ahg-glog-goto-revision-line)
                      (re-search-forward "o")
                      (replace-match "@")))
                 (funcall refresh root)))
