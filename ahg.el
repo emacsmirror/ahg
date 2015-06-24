@@ -1466,7 +1466,8 @@ do nothing."
             (progn
               (when is-revset
                 (let* ((limit (string-to-number
-                               (read-string "hg log, limit (optional): "))))
+                               (read-string "hg log, limit (default 100): "
+                                            nil nil "100"))))
                   (cond ((< limit 0)
                          (setq firstrev
                                (format "first(%s,%s)" firstrev (- limit))))
