@@ -334,13 +334,15 @@ summary shown in ahg-status buffers"
 ;; hg root
 ;;-----------------------------------------------------------------------------
 
-(defun ahg-root ()
-  "Returns the root of the tree handled by Mercurial, or nil if
-the current dir is not under hg."
+(defun ahg-root (&optional noerror)
+  "Returns the root of the tree handled by Mercurial. If NOERROR
+is nil, raises an error if the current dir is not under
+hg. Otherwise, the default-directory is returned."
   (let ((f (locate-dominating-file default-directory ".hg")))
     (if f
         (file-name-as-directory (expand-file-name f))
-      (error "aHg: no repository found in %s" default-directory))))
+      (if noerror default-directory
+        (error "aHg: no repository found in %s" default-directory)))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg identify
@@ -2828,7 +2830,7 @@ that buffer is refreshed instead.)"
          (cmdargs (mapconcat 'identity (cdr args) " "))
          (interpolate (member "*" (cdr args)))
          (buffer (get-buffer-create (concat "*hg command: "
-                                            (ahg-root) "*")))
+                                            (ahg-root t) "*")))
          (curdir default-directory)
          (should-refresh current-prefix-arg)
          (is-interactive
@@ -2863,7 +2865,7 @@ that buffer is refreshed instead.)"
     (ahg-generic-command
      cmdname (list cmdargs)
      (lexical-let ((should-refresh should-refresh)
-                   (aroot (ahg-root))
+                   (aroot (ahg-root t))
                    (is-mq (eq major-mode 'ahg-mq-patches-mode)))
        (lambda (process status)
          (if (string= status "finished\n")
