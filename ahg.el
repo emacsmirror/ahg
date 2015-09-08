@@ -4785,7 +4785,7 @@ patch editing functionalities provided by Emacs."
                                               is-interactive
                                               global-opts
                                               no-hgplain)
-  "Executes then given hg command, with the given
+  "Executes the given hg command, with the given
 arguments. SENTINEL is a sentinel function. BUFFER is the
 destination buffer. If nil, a new buffer will be used.
 "
