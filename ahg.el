@@ -2905,42 +2905,56 @@ that buffer is refreshed instead.)"
      t ;; use-shell
      nil ;; no-show-message
      t ;; report-untrusted
-     (when is-interactive 'ahg-do-command-filter) ;; filterfunc
+     (ahg-do-command-filter is-interactive) ;; filterfunc
      is-interactive ;; is-interactive
-     nil ;; global-opts
-     (not is-interactive) ;; no-hgplain
+     (list "--config" "progress.assume-tty=True"
+           "--config" "progress.clear-complete=False") ;; global-opts
+     t ;; no-hgplain
      )))
 
 
-(defun ahg-do-command-filter (process string)
-  (when (buffer-name (process-buffer process))
-    ;; insert output into the buffer
-    (with-current-buffer (process-buffer process)
-      (let ((moving (= (point) (process-mark process)))
-            (inhibit-read-only t))
-        (save-excursion
-          ;; Insert the text, advancing the process marker.
-          (goto-char (process-mark process))
-          (insert string)
-          (set-marker (process-mark process) (point))
-          ;; check if we are expecting a user name or a password
-          (let (user pass data)
+(defun ahg-do-command-filter (interactive)
+  (lexical-let ((interactive interactive))
+    (lambda (process string)
+      (when (buffer-name (process-buffer process))
+        ;; insert output into the buffer
+        (with-current-buffer (process-buffer process)
+          (let ((moving (= (point) (process-mark process)))
+                (inhibit-read-only t))
             (save-excursion
-              (backward-word)
-              (cond ((looking-at "\\<user: $") (setq user t))
-                    ((looking-at "\\<password: $") (setq pass t))))
-            (cond (user (setq data (concat (read-string "user: ") "\n"))
-                        (process-send-string process data))
-                  (pass (setq data (concat (read-passwd "password: ") "\n"))
-                        (process-send-string process data)
-                        (setq data "***\n")
-                        ))
-            (when data
-              (insert data)
-              (set-marker (process-mark process) (point)))
-            )
-          )
-        (if moving (goto-char (process-mark process)))))))
+              ;; Insert the text, advancing the process marker.
+              (goto-char (process-mark process))
+              (let* ((cr (regexp-quote (regexp-quote "")))
+                     (m (string-match cr string)))
+                (while m
+                  (forward-line 0)
+                  (delete-char
+                   (- (min (1+ (point-at-eol)) (point-max)) (point)))
+                  (setq string (substring string (1+ m)))
+                  (setq m (string-match cr string))
+                  )
+                (insert string))
+              (set-marker (process-mark process) (point))
+              ;; check if we are expecting a user name or a password
+              (when interactive
+                (let (user pass data)
+                  (save-excursion
+                    (backward-word)
+                    (cond ((looking-at "\\<user: $") (setq user t))
+                          ((looking-at "\\<password: $") (setq pass t))))
+                  (cond (user (setq data (concat (read-string "user: ") "\n"))
+                              (process-send-string process data))
+                        (pass (setq data
+                                    (concat (read-passwd "password: ") "\n"))
+                              (process-send-string process data)
+                              (setq data "***\n")
+                              ))
+                  (when data
+                    (insert data)
+                    (set-marker (process-mark process) (point))))
+                )
+              )
+            (if moving (goto-char (process-mark process)))))))))
   
 
 ;;-----------------------------------------------------------------------------
