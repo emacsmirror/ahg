@@ -2093,7 +2093,8 @@ prompts also for extra flags."
 (defvar ahg-glog-font-lock-keywords
   '(("^hg revision DAG for" . ahg-header-line-face)
     ("^hg revision DAG for \\(.*\\)" 1 ahg-header-line-root-face)
-    ("^\\([+|@o\\\\/ -]\\)+" . 'bold)
+    ("^\\([+|@o\\\\/ -]\\)+$" . 'bold) ;; duplicate to avoid bad fontification
+    ("^\\([+|@o\\\\/ -]\\)+ " . 'bold) ;; of status messages starting with `o'
     ("^\\([+|@o\\\\/ -]\\)+\\([0-9]+\\)" 2 ahg-short-log-revision-face)
     ("^\\([+|@o\\\\/ -]\\)+[0-9]+  \\([0-9a-f]+\\)" 2 ahg-log-revision-face)
     ("^\\([+|@o\\\\/ -]\\)+[0-9]+  [0-9a-f]+  \\([^ ]+\\)"
