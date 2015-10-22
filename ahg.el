@@ -967,15 +967,28 @@ ahg-status, and it has an ewoc associated with it."
                (outbuf (ewoc-buffer ew))
                (cfg (with-current-buffer buf ahg-window-configuration))
                (extra-switches
-                (with-current-buffer buf ahg-status-extra-switches)))
+                (with-current-buffer buf ahg-status-extra-switches))
+               (status-line
+                (concat "^\\("
+                        (mapconcat 'identity
+                                   '("M" "A" "R" "C" "!" "?" "I") "\\|")
+                        "\\) .+$"))
+               warninglines)
           (with-current-buffer buf
             (goto-char (point-min))
             (while (not (eobp))
-              (ewoc-enter-last
-               ew
-               (cons nil
-                     (cons (buffer-substring (point) (1+ (point)))
-                           (buffer-substring (+ (point) 2) (point-at-eol)))))
+              (if (looking-at status-line)
+                  (ewoc-enter-last
+                   ew
+                   (cons nil
+                         (cons (buffer-substring (point) (1+ (point)))
+                               (buffer-substring (+ (point) 2)
+                                                 (point-at-eol)))))
+                (setq warninglines
+                      (cons
+                       (concat
+                        (buffer-substring (point-at-bol) (point-at-eol))
+                        "\n") warninglines)))
               (forward-line 1)))
           (kill-buffer buf)
           (unless no-pop
@@ -984,6 +997,13 @@ ahg-status, and it has an ewoc associated with it."
           (with-current-buffer outbuf
             (let ((inhibit-read-only t)
                   (node (ewoc-nth ew 0)))
+              (when warninglines
+                (save-excursion
+                  (re-search-forward "^-+$")
+                  (forward-char 1)
+                  (mapc 'insert (nreverse warninglines))
+                  (insert (match-string 0) "\n")
+                  ))
               (when node (goto-char (ewoc-location node)))))
           (when point-pos
             (with-current-buffer outbuf
