@@ -435,7 +435,7 @@ Commands:
 \\{ahg-status-mode-map}
 "
   (buffer-disable-undo) ;; undo info not needed here
-  (toggle-read-only t)
+  (setq buffer-read-only t)
   (font-lock-mode nil)
   (define-key ahg-status-mode-map " " 'ahg-status-toggle-mark)
   (define-key ahg-status-mode-map "m" 'ahg-status-mark)
@@ -588,7 +588,7 @@ to pass extra switches to hg status."
   (interactive)
   (let ((buf (get-buffer-create "*aHg-status*"))
         (curdir default-directory)
-        (show-message (interactive-p))
+        (show-message (called-interactively-p 'interactive))
         (root (ahg-root)))
     (when ahg-status-consider-extra-switches
       (let ((sbuf (ahg-get-status-buffer root)))
@@ -1339,7 +1339,7 @@ Commands:
 (defun ahg-short-log-pp (data)
   "Pretty-printer for short log revisions."
   ;; data is a 4-elements list
-  (labels ((trim (n s) (if (> (length s) n) (substring s 0 n) s)))
+  (let ((trim (lambda (n s) (if (> (length s) n) (substring s 0 n) s))))
     (let* ((width (window-width (selected-window)))
            (p1 (car data))
            (p2 (cadr data))
@@ -1348,7 +1348,8 @@ Commands:
            (s (format "%7s | %s | %8s | %s"
                       (propertize p1 'face ahg-short-log-revision-face)
                       (propertize p2 'face ahg-short-log-date-face)
-                      (propertize (trim 8 p3) 'face ahg-short-log-user-face)
+                      (propertize (funcall trim 8 p3)
+                                  'face ahg-short-log-user-face)
                       p4))
            (pad (if (< (length s) width)
                     (make-string (- width (length s)) ? )
@@ -1358,7 +1359,7 @@ Commands:
         
 (defun ahg-short-log-insert-contents (ewoc contents)
   (let ((lines (split-string contents "\n")))
-    (flet ((format-line (line)
+    (let ((format-line (lambda (line)
                (if (and line (> (length line) 0))
                     (let* ((p1 (string-match " " line))
                            (p2 (string-match " " line (1+ p1)))
@@ -1368,8 +1369,8 @@ Commands:
                                   (substring line (1+ p1) p2)
                                   (substring line (1+ p2) p3)
                                   (substring line (1+ p3)))))
-                      (ewoc-enter-last ewoc data)))))
-      (mapcar 'format-line lines))))
+                      (ewoc-enter-last ewoc data))))))
+      (mapcar format-line lines))))
 
 
 (defun ahg-short-log-next (n)
@@ -1425,7 +1426,7 @@ Commands:
   "Move point to the revision REV. If REV is not found in the log buffer,
 do nothing."
   (interactive "P")
-  (when (interactive-p)
+  (when (called-interactively-p 'interactive)
     (unless rev
       (setq rev (read-string "Goto revision: "))))
   (let ((n (ewoc-nth ewoc 0)))
@@ -1595,7 +1596,7 @@ do nothing."
                         (revre (if rev (concat "^ *" (regexp-quote rev)) ""))
                         (done (null rev)))
                    (ahg-short-log-insert-contents ew contents)
-                   (goto-line 6)
+                   (ahg-goto-line 6)
                    (beginning-of-line)
                    (save-excursion
                      (while (and (not done) (not (eobp)))
@@ -1606,7 +1607,7 @@ do nothing."
                              (delete-char 1)
                              (insert ahg-short-log-active-rev-marker))
                          (forward-line 1))))
-                   (toggle-read-only 1)
+                   (setq buffer-read-only t)
                    (set (make-local-variable 'ewoc) ew))))
          (ahg-show-error process))))
      buffer)))
@@ -1720,7 +1721,7 @@ Commands:
 \\{ahg-log-mode-map}
 "
   (buffer-disable-undo) ;; undo info not needed here
-  (toggle-read-only t)
+  (setq buffer-read-only t)
   (define-key ahg-log-mode-map [?g] 'ahg-log)
   (define-key ahg-log-mode-map [?s] 'ahg-status)
   (define-key ahg-log-mode-map [?=] 'ahg-log-view-diff)
@@ -1943,32 +1944,32 @@ a prefix argument, prompts also for EXTRA-FLAGS."
 (defun ahg-format-log-buffer ()
   (goto-char (point-min))
   (let ((inhibit-read-only t))
-    (labels ((next () (beginning-of-line) (forward-line 1)))
+    (let ((next (lambda () (beginning-of-line) (forward-line 1))))
       (while (not (eobp))
         ;; changeset
         (insert "changeset:   ")
-        (next)
+        (funcall next)
         ;; svn rev
         (if (looking-at "^$")
             (delete-char 1)
           (insert "svn:         ")
-          (next))
+          (funcall next))
         ;; git hash
         (if (looking-at "^$")
             (delete-char 1)
           (insert "git:         ")
-          (next))
+          (funcall next))
         ;; phase
         (if (looking-at "^public$")
             (let ((kill-whole-line t))
               (kill-line))
           (insert "phase:       ")
-          (next))
+          (funcall next))
         ;; branch
         (if (looking-at "^$")
             (delete-char 1)
           (insert "branch:      ")
-          (next))
+          (funcall next))
         ;; tags
         (if (looking-at "^$")
             (delete-char 1) ;; remove empty line
@@ -1997,23 +1998,23 @@ a prefix argument, prompts also for EXTRA-FLAGS."
             (mapc (lambda (p) (insert "parent:      " p "\n")) parents)))
         ;; user
         (insert "user:        ")
-        (next)
+        (funcall next)
         ;; date
         (insert "date:        ")
-        (next)
+        (funcall next)
         ;; files, until an empty line is found
         (unless (looking-at "^$")
           (set-text-properties (point-at-bol) (point-at-eol)
                                (list 'mouse-face 'highlight
                                      'keymap ahg-log-file-line-map))
           (insert "files:       ")
-          (next))
+          (funcall next))
         (while (not (looking-at "^$"))
           (set-text-properties (point-at-bol) (point-at-eol)
                                (list 'mouse-face 'highlight
                                      'keymap ahg-log-file-line-map))
           (insert "             ")
-          (next))
+          (funcall next))
         (delete-char 1) ;; remove the empty line at the end of the list of files
         ;; rest is the description
         (insert "description:\n")
@@ -2021,7 +2022,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
         (while (and (looking-at "^\\(\t\\|$\\)") (not (eobp)))
           (unless (looking-at "^$")
             (delete-char 1)) ;; remove the \t in front of the line
-          (next))
+          (funcall next))
         (insert "\n\n")
         ))))
 
@@ -2120,7 +2121,7 @@ Commands:
 "
   (buffer-disable-undo) ;; undo info not needed here
   (setq truncate-lines t)
-  (toggle-read-only t)
+  (setq buffer-read-only t)
   (define-key ahg-glog-mode-map [?g] 'ahg-glog)
   (define-key ahg-glog-mode-map [?s] 'ahg-status)
   (define-key ahg-glog-mode-map [?=] 'ahg-glog-view-diff)
@@ -2271,8 +2272,8 @@ a prefix argument, prompts also for EXTRA-FLAGS."
         (ahg-update-to-rev-check-bookmarks t))
     (lexical-let ((refresh 'ahg-status-maybe-refresh)
                   (buf (current-buffer)))
-      (flet
-          ((ahg-status-maybe-refresh (root)
+      (letf
+          (((symbol-function 'ahg-status-maybe-refresh) (lambda (root)
                 (let ((inhibit-read-only t))
                    (save-excursion
                      (goto-char (point-min))
@@ -2292,7 +2293,7 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                      (ahg-glog-goto-revision-line)
                      (re-search-forward "o")
                      (replace-match "@")))
-                (funcall refresh root)))
+                (funcall refresh root))))
         (call-interactively 'ahg-update-to-rev)))))
 
 (defun ahg-glog-histedit-mess ()
@@ -2354,7 +2355,7 @@ Commands:
   (put 'ahg-diff-mode 'mode-class 'special)
   ; Remove trailing ^M's.  Without this, ^M's are inserted when applying hunks.
   (ahg-remove-^M)
-  (toggle-read-only t)
+  (setq buffer-read-only t)
   (save-excursion
     (goto-char (point-min))
     (while (and (not (eobp)) (not (looking-at "^---"))) (forward-line 1))
@@ -2389,7 +2390,7 @@ Commands:
 
 (defun ahg-diff (&optional r1 r2 files)
   (interactive "P")
-  (when (interactive-p)
+  (when (called-interactively-p 'interactive)
     (unless r1
       (setq r1 (read-string "hg diff, R1: " "tip"))
       (setq r2 (read-string "hg diff, R2: " ""))))
@@ -2621,7 +2622,7 @@ used.
                               (put-text-property beg end
                                                  'ahg-line-number aline)
                               (goto-char (1+ end))))
-                          (goto-line line)
+                          (ahg-goto-line line)
                           (unless (equal major-mode 'ahg-annotate-mode)
                             (ahg-annotate-mode))
                           (setq buffer-read-only t)
@@ -3230,7 +3231,7 @@ the files under version control."
                              (goto-char (1+ (point-at-eol)))))
                          (pop-to-buffer buf)
                          (redisplay)
-                         (mapcar
+                         (mapc
                           (lambda (f) (ahg-grep-filename f pattern))
                           (nreverse files))
                          (save-excursion
@@ -3771,7 +3772,7 @@ Commands:
   (font-lock-mode nil)
   ;;(hl-line-mode t)
   (setq truncate-lines t)
-  (toggle-read-only t)
+  (setq buffer-read-only t)
   (easy-menu-add ahg-mq-patches-mode-menu ahg-mq-patches-mode-map)
   )
 
@@ -3826,7 +3827,7 @@ Commands:
       (let ((ew (ahg-mq-patches-create-ewoc)))
         (ahg-mq-patches-insert-contents ew patches applied guards)
         (set (make-local-variable 'ewoc) ew)))
-      (toggle-read-only t)
+      (setq buffer-read-only t)
       (if point-pos
           (ahg-goto-line-point point-pos)
         (goto-char (point-min))
@@ -3855,7 +3856,7 @@ about which are currently applied."
   (interactive)
   (unless root (setq root (ahg-root)))
   (let ((buf (ahg-mq-get-patches-buffer root))
-        (msg (when (interactive-p)
+        (msg (when (called-interactively-p 'interactive)
                (format "aHg: getting patch queue for %s..." root)))
         (oldcolumns (getenv "COLUMNS")))
     (when msg (message msg))
@@ -4173,7 +4174,7 @@ so that filename completion works on patch names."
         (switch-to-buffer patchbuf)
         (ahg-cd root)
         (ahg-set-diff-mode)
-        (toggle-read-only nil)
+        (setq buffer-read-only nil)
         (local-set-key
          (kbd "C-c C-c")
          (lexical-let ((root root)
@@ -4905,7 +4906,7 @@ Commands:
 \\{ahg-command-mode-map}
 "
   (buffer-disable-undo) ;; undo info not needed here
-  (toggle-read-only t)
+  (setq buffer-read-only t)
   (font-lock-mode nil)
   (define-key ahg-command-mode-map "h" 'ahg-command-help)
   (define-key ahg-command-mode-map "q" 'ahg-buffer-quit)
@@ -4945,9 +4946,12 @@ Commands:
 (defun ahg-line-point-pos ()
   (cons (line-number-at-pos) (- (point) (point-at-bol))))
 
+(defun ahg-goto-line (line)
+  (goto-char (point-min))
+  (forward-line (1- line)))
+
 (defun ahg-goto-line-point (lp)
-  ;;(goto-char (point-min))
-  (goto-line (car lp))
+  (ahg-goto-line (car lp))
   (forward-char (min (cdr lp) (- (point-at-eol) (point-at-bol)))))
 
 (defun ahg-cd (dir)
@@ -5026,12 +5030,12 @@ Commands:
         (otherwise (setq red    value
                          green  pp
                          blue   qq))))
-    (flet ((int-to-hex (int) (substring (format "%04X" int) (- 4)))
-           (scale (x) (floor (* x 65535.0))))
+    (let ((int-to-hex (lambda (int) (substring (format "%04X" int) (- 4))))
+          (scale (lambda (x) (floor (* x 65535.0)))))
       (concat "#"
-              (int-to-hex (scale red))
-              (int-to-hex (scale green))
-              (int-to-hex (scale blue))))))
+              (funcall int-to-hex (funcall scale red))
+              (funcall int-to-hex (funcall scale green))
+              (funcall int-to-hex (funcall scale blue))))))
 
 (defun ahg-get-bookmarks (rev)
   (with-temp-buffer
