@@ -3188,7 +3188,7 @@ the files under version control."
                  grep-setup-hook))
                (buf (grep
                      (format "%s files -0 %s | xargs -0 grep -I -nHE -e %s"
-                             ahg-hg-command
+                             (ahg-hg-command)
                              (if glob (concat "'glob:" glob "'") "")
                              (shell-quote-argument pattern))))
                (prevbuf (get-buffer "*ahg-grep*"))
@@ -4829,7 +4829,7 @@ destination buffer. If nil, a new buffer will be used.
                       'start-file-process-shell-command 
                     'start-file-process)
                   (concat "*ahg-command-" command "*") buffer
-                  ahg-hg-command
+                  (ahg-hg-command)
                   (append
                    (unless report-untrusted
                      (list "--config" "ui.report_untrusted=0"))
@@ -4959,8 +4959,14 @@ Commands:
       (cd dir)
     (error nil)))
 
+(defun ahg-hg-command ()
+  "Returns the command to use for invoking Mercurial.
+Defined as a function to make it easier for the user to customize
+for advanced settings (e.g. by defining an advice)."
+  ahg-hg-command)
+
 (defun ahg-call-process (cmd &optional args global-opts)
-  (let ((callargs (append (list ahg-hg-command nil t nil
+  (let ((callargs (append (list (ahg-hg-command) nil t nil
                                 "--config" "ui.report_untrusted=0")
                           global-opts (list cmd) args)))
     ;;(message "callargs: %s" callargs)
