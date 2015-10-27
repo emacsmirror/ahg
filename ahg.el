@@ -998,13 +998,20 @@ ahg-status, and it has an ewoc associated with it."
             (let ((inhibit-read-only t)
                   (node (ewoc-nth ew 0)))
               (when warninglines
+                (let ((warn-re (concat "\\("
+                                       (mapconcat 'regexp-quote warninglines
+                                                  "\\)\\|\\(")
+                                       "\\)")))
+                  (save-excursion
+                    (while (re-search-forward warn-re nil t)
+                      (replace-match ""))))
                 (save-excursion
                   (re-search-forward "^-+$")
-                  (forward-char 1)
+                  (goto-char (point-max))
+                  (insert "\n" (match-string 0) "\nWarnings:\n")
                   (mapc 'insert (nreverse warninglines))
-                  (insert (match-string 0) "\n")
                   ))
-              (when node (goto-char (ewoc-location node)))))
+                (when node (goto-char (ewoc-location node)))))
           (when point-pos
             (with-current-buffer outbuf
               (ahg-goto-line-point point-pos)))
