@@ -723,7 +723,10 @@ the singleton list with the node at point."
 (defun ahg-status-add ()
   (interactive)
   (let ((files (ahg-status-get-marked
-                'all (lambda (data) (string= (cadr data) "?")))))
+                'all (lambda (data)
+                       (let ((s (cadr data)))
+                         (or (string= s "?")
+                             (string= s "I")))))))
     (if (ahg-y-or-n-p (format "Add %d files to hg? " (length files)))
         (ahg-generic-command
          "add" (mapcar 'cddr files)
@@ -763,8 +766,10 @@ the singleton list with the node at point."
   (interactive)
   (let ((files (ahg-status-get-marked
                 'all (lambda (data)
-                       (or (string= (cadr data) "?")
-                           (string= (cadr data) "!"))))))
+                       (let ((s (cadr data)))
+                         (or (string= s "?")
+                             (string= s "!")
+                             (string= s "I")))))))
     (if (ahg-y-or-n-p (format "Add/Remove %d files to/from hg? "
                               (length files)))
         (ahg-generic-command
