@@ -2668,6 +2668,7 @@ Commands:
   (define-key ahg-annotate-mode-map "a" 'ahg-annotate-annotate)
   (define-key ahg-annotate-mode-map "u" 'ahg-annotate-uncover)
   (define-key ahg-annotate-mode-map "q" 'ahg-buffer-quit)
+  (define-key ahg-annotate-mode-map (kbd "RET") 'ahg-annotate-goto-line)
   (easy-menu-add ahg-annotate-mode-menu ahg-annotate-mode-map))
 
 (easy-menu-define ahg-annotate-mode-menu ahg-annotate-mode-map "aHg Annotate"
@@ -2676,6 +2677,7 @@ Commands:
     ["Log Line's Revision" ahg-annotate-log [:keys "l" :active t]]
     ["Annotate Line's Revision" ahg-annotate-annotate [:keys "a" :active t]]
     ["Uncover Line" ahg-annotate-uncover [:keys "u" :active t]]
+    ["Go To Line" ahg-annotate-goto-line [:keys "\r" :active t]]
     ["Quit" ahg-buffer-quit [:keys "q" :active t]]))
 
 ;; Adapted from vc-annotate-font-lock-keywords
@@ -2787,6 +2789,28 @@ Lets you step back in time for that line."
    ahg-annotate-current-file 
    (ahg-annotate-revision-at-line)
    (ahg-annotate-line-at-line)))
+
+(defun ahg-annotate-goto-line ()
+  "Go to the line corresponding to the current aHg Annotate line."
+  (interactive)
+  (unless (eq major-mode 'ahg-annotate-mode)
+    (error "Not in a VC-Annotate buffer"))
+  (let ((line (ahg-annotate-line-at-line)))
+    (pop-to-buffer
+     (or (and (file-exists-p ahg-annotate-current-file)
+	      (find-file-noselect ahg-annotate-current-file))
+	 (error "File not found: %s" ahg-annotate-current-file)))
+    (save-restriction
+      (widen)
+      (goto-char (point-min))
+      (forward-line (1- line))
+      (recenter))
+    ;; Issue a warning if the lines might be incorrect.
+    (cond
+     ((buffer-modified-p)
+      (message "Buffer modified; annotated line numbers may be incorrect"))
+     ((not (string= (ahg-file-status buffer-file-name) "C"))
+      (message "File is not up-to-date; annotated line numbers may be incorrect")))))
 
 ;;-----------------------------------------------------------------------------
 ;; hg heads, bookmarks and tags
@@ -4963,6 +4987,17 @@ Commands:
     (when (and (or (not root) (ahg-cd root))
                (= (ahg-call-process "id" (list "-n")) 0))
       (= (char-before (1- (point-max))) ?+))))
+
+(defun ahg-file-status (filename)
+  (let ((dir (file-name-directory filename))
+        (name (file-name-nondirectory filename)))
+    (with-temp-buffer
+      (if (and (ahg-cd dir)
+               (= (ahg-call-process "status" (list "-A" name)) 0)
+               (goto-char (point-min))
+               (search-forward name nil t))
+          (buffer-substring-no-properties (point-at-bol) (1+ (point-at-bol)))
+        (error "Impossible to obtain hg status for file: %s" filename)))))
 
 (defun ahg-line-point-pos ()
   (cons (line-number-at-pos) (- (point) (point-at-bol))))
