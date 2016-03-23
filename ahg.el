@@ -2917,8 +2917,8 @@ Lets you step back in time for that line."
          (cmd (if idx (substring command idx) ""))
          (matches
           (cond ((string-match "^-.*$" cmd) (list cmd))
-                ((= idx 0) (ahg-complete-command-name command))
-                ((and (= idx 5) (string= (substring command 0 idx) "help "))
+                ((and idx (= idx 0)) (ahg-complete-command-name command))
+                ((and idx (= idx 5) (string= (substring command 0 idx) "help "))
                  (ahg-complete-command-name cmd))
                 (t
                  (let ((default-directory
