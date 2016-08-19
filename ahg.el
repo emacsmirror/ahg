@@ -866,11 +866,12 @@ the file on the current line."
          (if all (ahg-status-get-marked 'all)
            (let ((n (ewoc-locate ewoc))) (when n (list (ewoc-data n)))))))
     (if files
-        (ahg-diff (ahg-rev-id ".")
-                  (ahg-rev-id
+        (ahg-diff (ahg-rev-id
                    (if askrev
-                       (read-string "revision to diff against: " "p1(.)")
-                     "p1(.)")) (mapcar 'cddr files))
+                       (read-string "revision to diff against: "
+                                    nil nil "p1(.)") "p1(.)"))
+                  (ahg-rev-id ".")
+                  (mapcar 'cddr files))
       (message "aHg diff: no file selected."))))
 
 
@@ -884,8 +885,9 @@ wrt. its parent revision, using Ediff."
         (let ((ahg-diff-revs
                (cons (ahg-rev-id
                       (if askrev
-                          (read-string "revision to diff against: " "p1(.)")
-                        "p1(.)")) (ahg-rev-id "."))))
+                          (read-string "revision to diff against: "
+                                       nil nil "p1(.)") "p1(.)"))
+                     (ahg-rev-id "."))))
           (ahg-diff-ediff filename))
       (message "aHg diff: no file selected."))))
 
