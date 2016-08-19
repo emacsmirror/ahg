@@ -857,34 +857,42 @@ the singleton list with the node at point."
           (ahg-status))))))
 
 
-(defun ahg-status-diff (&optional all)
+(defun ahg-status-diff (askrev &optional all)
   "Shows changes of the current revision wrt. its parent. If ALL is t,
 shows changes of all marked files. Otherwise, shows changes of
 the file on the current line."
-  (interactive)
+  (interactive "P")
   (let ((files
          (if all (ahg-status-get-marked 'all)
            (let ((n (ewoc-locate ewoc))) (when n (list (ewoc-data n)))))))
     (if files
-        (ahg-diff nil nil (mapcar 'cddr files))
+        (ahg-diff (ahg-rev-id ".")
+                  (ahg-rev-id
+                   (if askrev
+                       (read-string "revision to diff against: " "p1(.)")
+                     "p1(.)")) (mapcar 'cddr files))
       (message "aHg diff: no file selected."))))
 
 
-(defun ahg-status-diff-ediff ()
+(defun ahg-status-diff-ediff (askrev)
   "Shows diff of the working directory version of the current selected file
 wrt. its parent revision, using Ediff."
-  (interactive)
+  (interactive "P")
   (let* ((n (ewoc-locate ewoc))
          (filename (when n (cddr (ewoc-data n)))))
     (if filename
-        (let ((ahg-diff-revs (cons nil (ahg-rev-id "."))))
+        (let ((ahg-diff-revs
+               (cons (ahg-rev-id
+                      (if askrev
+                          (read-string "revision to diff against: " "p1(.)")
+                        "p1(.)")) (ahg-rev-id "."))))
           (ahg-diff-ediff filename))
       (message "aHg diff: no file selected."))))
 
 
-(defun ahg-status-diff-all ()
-  (interactive)
-  (ahg-status-diff t))
+(defun ahg-status-diff-all (askrev)
+  (interactive "P")
+  (ahg-status-diff askrev t))
 
 
 (defun ahg-status-delete ()
