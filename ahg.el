@@ -869,8 +869,8 @@ the file on the current line."
         (ahg-diff (ahg-rev-id
                    (if askrev
                        (read-string "revision to diff against: "
-                                    nil nil "p1(.)") "p1(.)"))
-                  (ahg-rev-id ".")
+                                    nil nil ".") "."))
+                  nil
                   (mapcar 'cddr files))
       (message "aHg diff: no file selected."))))
 
@@ -886,8 +886,8 @@ wrt. its parent revision, using Ediff."
                (cons (ahg-rev-id
                       (if askrev
                           (read-string "revision to diff against: "
-                                       nil nil "p1(.)") "p1(.)"))
-                     (ahg-rev-id "."))))
+                                       nil nil ".") "."))
+                     nil)))
           (ahg-diff-ediff filename))
       (message "aHg diff: no file selected."))))
 
