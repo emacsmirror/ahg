@@ -2880,7 +2880,7 @@ Lets you step back in time for that line."
 (defun ahg-heads ()
   "Show the heads of the repository in a tabular view, similar to `ahg-short-log'."
   (interactive)
-  (ahg-short-log-impl "hg heads" "{if(tags, '[{tags}]  ')}{if(bookmarks, '\\{{bookmarks}}  ')}" "[Tags] {Bookmarks}"
+  (ahg-short-log-impl "hg heads" "{if(tags, '[{tags}]  ')}{if(bookmarks, '\\{{bookmarks}}  ')}{ifeq(branch, 'default', '', '({branch})')}" "[Tags] {Bookmarks} (Branch)"
                       "head() and tip:0" nil nil))
 
 
