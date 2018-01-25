@@ -1533,7 +1533,7 @@ do nothing."
 
 
 (defun ahg-maybe-revset (rev)
-  (not (null (string-match "[()]" rev))))
+  (not (null (string-match "[:()]" rev))))
 
 
 ;; helper function used by ahg-short-log, ahg-log and ahg-log-cur-file to
