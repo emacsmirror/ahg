@@ -1540,7 +1540,8 @@ do nothing."
 ;; get arguments from the user
 (defvar ahg-log-default-revisions '("tip" . "0"))
 (defvar ahg-log-default-extra-flags "")
-(defun ahg-log-read-args (is-on-selected-files read-extra-flags)
+(defun ahg-log-read-args (is-on-selected-files read-extra-flags
+                                               &optional reverse)
   (let* ((firstrev
           (read-string
            (concat "hg log"
@@ -1566,13 +1567,16 @@ do nothing."
                                  (if is-on-selected-files
                                      " (on selected files)" "") ", R2: "))
                               (unless is-revset deflimit) nil deflimit))))
-                (cond ((if is-revset (< limit 0) (> limit 0))
+                (cond ((and (not is-revset) (> limit 0))
+                       (setq firstrev
+                             (format "%s:%s" firstarg-to-save limit)))
+                      ((if is-revset (< limit 0) (> limit 0))
                        (setq firstrev
                              (format "first(%s,%s)" firstrev (abs limit))))
                       ((if is-revset (> limit 0) (< limit 0))
                        (setq firstrev
                              (format "last(%s,%s)" firstrev (abs limit)))))
-                firstrev))
+                (if reverse firstrev (format "reverse(%s)" firstrev))))
             nil)
            (when read-extra-flags
              (list (read-string
@@ -2277,7 +2281,7 @@ consider. When run interactively, the user must enter their
 values (which default to tip for R1 and 0 for R2). If called with
 a prefix argument, prompts also for EXTRA-FLAGS."
   (interactive
-   (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))
+   (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg t))
   (let* ((root (ahg-root))
          (buffer (get-buffer-create
                  (concat "*hg glog: " root "*")))
