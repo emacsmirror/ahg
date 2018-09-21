@@ -1560,7 +1560,7 @@ do nothing."
                      (limit (string-to-number
                              (read-string
                               (if is-revset
-                                  (format "hg log, limit (default %s: "
+                                  (format "hg log, limit (default %s): "
                                           deflimit)
                                 (concat
                                  "hg log"
