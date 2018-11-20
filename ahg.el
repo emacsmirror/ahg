@@ -1579,7 +1579,8 @@ do nothing."
                              (format "first(%s,%s)" firstrev (abs limit))))
                       ((if is-revset (> limit 0) (< limit 0))
                        (setq firstrev
-                             (format "last(%s,%s)" firstrev (abs limit)))))
+                             (format "last(0:%s,%s)" firstarg-to-save
+                                     (abs limit)))))
                 (if reverse firstrev (format "reverse(%s)" firstrev))))
             nil)
            (when read-extra-flags
