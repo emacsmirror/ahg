@@ -1979,6 +1979,13 @@ a prefix argument, prompts also for EXTRA-FLAGS."
                  (r2 (ahg-first-parent-of-rev r1))
                  (fn (ahg-log-filename-at-point (point) t)))
             (ahg-diff r2 r1 (list fn)))))
+    (define-key map "D"
+      (lambda (rev)
+        (interactive "sEnter revision to compare against: ")
+          (let* ((r1 (ahg-log-revision-at-point t))
+                 (r2 rev)
+                 (fn (ahg-log-filename-at-point (point) t)))
+            (ahg-diff r2 r1 (list fn)))))
     (define-key map "e"
       (lambda ()
         (interactive)
