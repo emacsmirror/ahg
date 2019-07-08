@@ -2641,7 +2641,7 @@ used.
         (ahg-generic-command
          "log" 
          (append
-          (list "--template" "{rev} {desc|firstline))}\\n" relfile)
+          (list "--template" "{rev} {desc|firstline}\\n" relfile)
           (when rev (list "-r" (concat rev ":0" ))))
          (lambda (process status)
            (if (string= status "finished\n")
