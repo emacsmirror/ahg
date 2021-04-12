@@ -4921,7 +4921,9 @@ destination buffer. If nil, a new buffer will be used.
         (process-connection-type use-shell)
         (process-adaptive-read-buffering nil))
     (unless no-hgplain (setenv "HGPLAINEXCEPT" "alias,revsetalias"))
-    (unless ahg-i18n (setenv "LANG"))
+    (unless ahg-i18n
+      (if (string= ahg-subprocess-coding-system "utf-8")
+          (setenv "LANG" "C.UTF-8") (setenv "LANG")))
     ;; (when (and (not use-shell) use-temp-file)
     ;;   (setq args (mapcar 'shell-quote-argument args)))
     (let ((process
