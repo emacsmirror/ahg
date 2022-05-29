@@ -4898,6 +4898,10 @@ patch editing functionalities provided by Emacs."
     (ahg-pop-window-configuration)
     (kill-buffer buf)))
 
+
+(defun ahg-start-file-process-shell-command (name buffer &rest args)
+  (start-file-process-shell-command name buffer (mapconcat 'identity args " ")))
+
 (defun ahg-generic-command (command args sentinel
                                     &optional buffer
                                               use-shell
@@ -4928,7 +4932,7 @@ destination buffer. If nil, a new buffer will be used.
     ;;   (setq args (mapcar 'shell-quote-argument args)))
     (let ((process
            (apply (if use-shell
-                      'start-file-process-shell-command 
+                      'ahg-start-file-process-shell-command 
                     'start-file-process)
                   (concat "*ahg-command-" command "*") buffer
                   (ahg-hg-command)
