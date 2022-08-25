@@ -1699,7 +1699,7 @@ consider. When run interactively, the user must enter their
 values (which default to tip for R1 and 0 for R2). If called with
 a prefix argument, prompts also for EXTRA-FLAGS."
   (interactive
-   (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))
+   (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg t))
   (ahg-short-log-impl "hg log (summary)" "{desc|firstline}" "Summary"
                       r1 r2 extra-flags))
 
@@ -1901,7 +1901,7 @@ consider. When run interactively, the user must enter their
 values (which default to tip for R1 and 0 for R2). If called with
 a prefix argument, prompts also for EXTRA-FLAGS."
   (interactive
-   (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg))
+   (ahg-log-read-args ahg-file-list-for-log-command current-prefix-arg t))
   (let* ((root (ahg-root))
          (buffer (get-buffer-create
                   (concat "*hg log (details): " root "*")))
