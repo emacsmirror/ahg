@@ -1579,7 +1579,7 @@ do nothing."
                              (format "first(%s,%s)" firstrev (abs limit))))
                       ((if is-revset (> limit 0) (< limit 0))
                        (setq firstrev
-                             (format "reverse(last(%s,%s))" firstrev
+                             (format "last(%s,%s)" firstrev
                                      (abs limit)))))
                 (if reverse firstrev (format "reverse(%s)" firstrev))))
             nil)
