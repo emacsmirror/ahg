@@ -3181,6 +3181,10 @@ that buffer is refreshed instead.)"
                          (substring glob 2))))
     glob))
 
+(defun ahg-manifest-grep-get-files (glob)
+  (format "%s files -0 %s" (ahg-hg-command)
+          (if glob (concat "'glob:" glob "'") "")))
+
 (defun ahg-manifest-grep (pattern glob)
   "Search for grep-like pattern in the working directory, considering only
 the files under version control."
@@ -3292,9 +3296,8 @@ the files under version control."
                            compilation-finish-functions))))
                  grep-setup-hook))
                (buf (grep
-                     (format "%s files -0 %s | xargs -0 grep -I -nHE -e %s"
-                             (ahg-hg-command)
-                             (if glob (concat "'glob:" glob "'") "")
+                     (format "%s | xargs -0 grep -I -nHE -e %s"
+                             (ahg-manifest-grep-get-files glob)
                              (shell-quote-argument pattern))))
                (prevbuf (get-buffer "*ahg-grep*"))
                (inhibit-read-only t))
