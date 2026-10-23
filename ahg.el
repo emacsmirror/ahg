@@ -3039,9 +3039,23 @@ that buffer is refreshed instead.)"
             (save-excursion
               ;; Insert the text, advancing the process marker.
               (goto-char (process-mark process))
-              (let* ((cr (regexp-quote (regexp-quote "")))
+              ;; a pty translates newlines into CR LF: only a lone CR
+              ;; (e.g. from progress bars) must erase the current line.
+              ;; A CR at the end of a chunk might be followed by a LF in
+              ;; the next one, so we defer it.
+              (setq string (concat (process-get process 'ahg-pending-cr)
+                                   string))
+              (process-put process 'ahg-pending-cr nil)
+              (when (string-match-p "\r\\'" string)
+                (process-put process 'ahg-pending-cr "\r")
+                (setq string (substring string 0 -1)))
+              (setq string (replace-regexp-in-string "\r\n" "\n" string))
+              (let* ((cr (regexp-quote "\r"))
                      (m (string-match cr string)))
                 (while m
+                  ;; keep the text preceding the CR, then discard the
+                  ;; (partial) current line, as a terminal would do
+                  (insert (substring string 0 m))
                   (forward-line 0)
                   (delete-char
                    (- (min (1+ (point-at-eol)) (point-max)) (point)))
